@@ -1,0 +1,6 @@
+-----docker check the data ---
+-> docker ps -> get the current container 
+->docker exec -it <container_id_or_name> bash -> access the postgresql container 
+-> psql -U root -d postgres -> connect with db 
+-> ready to use 
+

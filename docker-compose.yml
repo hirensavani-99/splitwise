@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: Hiren123
+      POSTGRES_DB: Spiltwise
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/schema.sql
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgres://root:Hiren123@db:5432/Spiltwise?sslmode=disable
+      PORT: 8080
