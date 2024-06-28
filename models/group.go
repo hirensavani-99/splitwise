@@ -23,11 +23,30 @@ func (g *Groups) Save() error {
 	}
 	defer stmt.Close()
 
-	err = stmt.QueryRow(g.Name, g.Description).Scan(&g.ID)
+	_, err = stmt.Exec(g.Name, g.Description)
 	if err != nil {
 		return fmt.Errorf("error executing query: %w", err)
 	}
 
 	return nil
 
+}
+
+func (g *Groups) AddMember(userId int64) error {
+
+	query := "INSERT INTO group_member (group_id,user_id) VALUES ($1, $2)"
+
+	stmt, err := db.DB.Prepare(query)
+
+	if err != nil {
+		return fmt.Errorf("error preparing query: %w", err)
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(g.ID, userId)
+	if err != nil {
+		return fmt.Errorf("error executing query: %w", err)
+	}
+
+	return nil
 }

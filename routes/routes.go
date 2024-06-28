@@ -4,5 +4,6 @@ import "github.com/gin-gonic/gin"
 
 func RegisterRoutes(server *gin.Engine) {
 	server.POST("/signup", signUp)
-	server.POST("/group", createGroup)
+	server.POST("/createGroup", createGroup)
+	server.POST("/groups/:group_Id/member", AddMemberToGroup)
 }

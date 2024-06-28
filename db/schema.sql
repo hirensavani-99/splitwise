@@ -11,3 +11,10 @@ CREATE TABLE IF NOT EXISTS groups (
     description TEXT
 );
 
+
+CREATE TABLE IF NOT EXISTS group_member (
+    id SERIAL PRIMARY KEY,
+    group_id INT REFERENCES groups(id),
+    user_id INT REFERENCES users(id)
+);
+
