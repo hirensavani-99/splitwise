@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,7 +10,7 @@ import (
 )
 
 type requestBody struct {
-	UserID int64 `json:"userId" binding:"required"`
+	UserIDs []int64 `json:"userIds" binding:"required"`
 }
 
 func createGroup(context *gin.Context) {
@@ -39,45 +38,34 @@ func createGroup(context *gin.Context) {
 
 func AddMemberToGroup(context *gin.Context) {
 	groupId, err := strconv.ParseInt(context.Param("group_Id"), 10, 64)
-
-	var requestBody requestBody
-
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Invalid groupId"})
 		return
 	}
 
+	var requestBody requestBody
 	if err := context.ShouldBindJSON(&requestBody); err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data."})
 		return
 	}
 
-	group := models.Groups{ID: groupId}
-	err = group.AddMember(requestBody.UserID)
-
+	err = addMembersToGroup(groupId, requestBody.UserIDs)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not add member to group.", "err": err.Error()})
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not add members to group.", "err": err.Error()})
 		return
 	}
 
-	context.JSON(http.StatusOK, gin.H{"message": "Member added successfully"})
+	context.JSON(http.StatusOK, gin.H{"message": "Members added successfully"})
 }
 
-// func AddMemberToGroup1(groupId int64, userId int64) error {
 
-// 	group := models.Groups{ID: groupId}
-// 	err := group.AddMember(userId)
-
-// 	if err != nil {
-// 		return errors.New("unable to add member in to group")
-// 	}
-
-// 	return nil
-// }
-
-// // [1,2,3,4,5]
-// func AddgroupMembers(members []int) {
-// 	for index, value := range members {
-
-// 	}
-// }
+func addMembersToGroup(groupId int64, userIds []int64) error {
+	group := models.Groups{ID: groupId}
+	for _, userId := range userIds {
+		err := group.AddMember(userId)
+		if err != nil {
+			return fmt.Errorf("unable to add member with ID %d to group: %w", userId, err)
+		}
+	}
+	return nil
+}
