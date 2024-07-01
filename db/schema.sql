@@ -18,3 +18,17 @@ CREATE TABLE IF NOT EXISTS group_member (
     user_id INT REFERENCES users(id)
 );
 
+
+CREATE TABLE IF NOT EXIST expense(
+    id SERIAL PRIMARY KEY,
+    description TEXT,
+    amount DECIMAL(10, 2) NOT NULL,
+    currency VARCHAR(3) NOT NULL,
+    category VARCHAR(255),
+    added_at TIMESTAMP NOT NULL,
+    is_recurring BOOLEAN NOT NULL,
+    recurring_period VARCHAR(255),
+    notes TEXT,
+    group_id INT REFERENCES groups(id),
+    AddedBY INT REFERENCES users(id)
+)
