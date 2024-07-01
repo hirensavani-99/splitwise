@@ -10,25 +10,28 @@ type Groups struct {
 	ID          int64
 	Name        string
 	Description string
-	Members     []User
+	UserIds     []int64 `json:"userIds" binding:"required"`
 }
 
-func (g *Groups) Save() error {
+func (g *Groups) Save() (int64, error) {
 
+	var groupId int64
 	query := "INSERT INTO groups (name,description) VALUES ($1, $2) RETURNING id"
 
 	stmt, err := db.DB.Prepare(query)
 	if err != nil {
-		return fmt.Errorf("error preparing query: %w", err)
+		return 0, err
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(g.Name, g.Description)
+	err = stmt.QueryRow(g.Name, g.Description).Scan(&groupId)
 	if err != nil {
-		return fmt.Errorf("error executing query: %w", err)
+		return 0, err
 	}
 
-	return nil
+	fmt.Println(groupId)
+
+	return groupId, nil
 
 }
 

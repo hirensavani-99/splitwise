@@ -17,23 +17,26 @@ func createGroup(context *gin.Context) {
 	var group models.Groups
 
 	err := context.ShouldBindJSON(&group)
-
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data."})
 		return
 	}
 
-	err = group.Save()
-
-	fmt.Println(err)
+	groupid, err := group.Save()
 
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not save group.", "err": err})
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Error saving group.", "err": err})
 		return
 	}
 
-	context.JSON(http.StatusCreated, gin.H{"message": "group created successfully"})
+	err = addMembersToGroup(groupid, group.UserIds)
 
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Error adding members to group.", "err": err})
+		return
+	}
+
+	context.JSON(http.StatusOK, gin.H{"message": "Group created successfully."})
 }
 
 func AddMemberToGroup(context *gin.Context) {
@@ -55,9 +58,13 @@ func AddMemberToGroup(context *gin.Context) {
 		return
 	}
 
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not commit transaction.", "err": err})
+		return
+	}
+
 	context.JSON(http.StatusOK, gin.H{"message": "Members added successfully"})
 }
-
 
 func addMembersToGroup(groupId int64, userIds []int64) error {
 	group := models.Groups{ID: groupId}
