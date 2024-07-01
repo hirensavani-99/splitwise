@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS group_member (
 );
 
 
-CREATE TABLE IF NOT EXIST expense(
+CREATE TABLE IF NOT EXISTS expense(
     id SERIAL PRIMARY KEY,
     description TEXT,
     amount DECIMAL(10, 2) NOT NULL,
@@ -30,5 +30,5 @@ CREATE TABLE IF NOT EXIST expense(
     recurring_period VARCHAR(255),
     notes TEXT,
     group_id INT REFERENCES groups(id),
-    AddedBY INT REFERENCES users(id)
+    added_by INT REFERENCES users(id)
 )

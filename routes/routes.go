@@ -6,4 +6,5 @@ func RegisterRoutes(server *gin.Engine) {
 	server.POST("/signup", signUp)
 	server.POST("/createGroup", createGroup)
 	server.POST("/groups/:group_Id/member", AddMemberToGroup)
+	server.POST("/groups/expense", createExpense)
 }
