@@ -31,4 +31,13 @@ CREATE TABLE IF NOT EXISTS expense(
     notes TEXT,
     group_id INT REFERENCES groups(id),
     added_by INT REFERENCES users(id)
-)
+);
+
+CREATE TABLE IF NOT EXISTS wallets (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id),
+    balance DECIMAL(10, 2) NOT NULL,
+    currency VARCHAR(3) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

@@ -18,7 +18,7 @@ func signUp(context *gin.Context) {
 
 	}
 
-	err = user.Save()
+	userId, err := user.Save()
 
 	fmt.Println(err)
 
@@ -27,5 +27,15 @@ func signUp(context *gin.Context) {
 		return
 	}
 
-	context.JSON(http.StatusCreated, gin.H{"message": "User created successfully"})
+	res := models.NewWallet(userId, 0.0, "CAD")
+
+	err = res.Save()
+	fmt.Println(err)
+
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not create wallet.", "err": err})
+		return
+	}
+
+	context.JSON(http.StatusCreated, gin.H{"message": "User & wallete are  created successfully"})
 }
