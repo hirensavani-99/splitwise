@@ -28,25 +28,18 @@ type Expense struct {
 func userInGroup(db *sql.DB, userId int64, groupId int64) (bool, error) {
 	var exists bool
 	query := `SELECT EXISTS (SELECT 1 FROM group_member WHERE user_id = $1 AND group_id = $2)`
+	err := db.QueryRow(query, userId, groupId).Scan(&exists)
 
-	stmt, err := db.Prepare(query)
 	if err != nil {
 		return false, err
 	}
-	defer stmt.Close()
-	err = stmt.QueryRow(userId, groupId).Scan(&exists)
 
-	if err != nil {
-		return false, fmt.Errorf("error checking group membership : %w", err)
-	}
-
-	fmt.Print(exists, userId, groupId, query)
 	return exists, nil
 }
 
 func (ex *Expense) Save() error {
 
-	isMember, err := userInGroup(db.DB, ex.Groupid, ex.AddedBy)
+	isMember, err := userInGroup(db.DB, ex.AddedBy, ex.Groupid)
 
 	if err != nil {
 		return err
