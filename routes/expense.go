@@ -8,6 +8,10 @@ import (
 	"hirensavani.com/models"
 )
 
+// func getExpense(context, *gin.Context) {
+
+// }
+
 func createExpense(context *gin.Context) {
 	var expense models.Expense
 

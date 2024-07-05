@@ -45,7 +45,8 @@ func userInGroup(db *sql.DB, userId int64, groupId int64) (bool, error) {
 	return exists, nil
 }
 
-func CalculateBalance(expense *Expense) []Balances {
+func CalculateBalance(expense *Expense) ([]Balances, float64) {
+	payerPayBackAmount := expense.Amount
 	totalAmount := expense.Amount
 	numUsers := len(expense.AddTo)
 
@@ -54,25 +55,26 @@ func CalculateBalance(expense *Expense) []Balances {
 	for userId, _ := range expense.AddTo {
 		fmt.Println(userId)
 		userID, _ := strconv.ParseInt(userId, 10, 64)
-		fmt.Println(expense.SplitType)
+
 		switch expense.SplitType {
 
 		case "equal":
 			amountPerUser := totalAmount / float64(numUsers)
+			if userID == expense.AddedBy {
+				payerPayBackAmount -= amountPerUser
+				continue
+			}
 
-			fmt.Println(amountPerUser)
 			balances = append(balances, Balances{
 				FromUserID: expense.AddedBy,
 				ToUserID:   userID,
 				Amount:     amountPerUser,
 			})
 
-			fmt.Println(balances)
-
 		}
 	}
 
-	return balances
+	return balances, payerPayBackAmount
 }
 
 func insertDebt(db *sql.DB, bal Balances) error {
@@ -98,26 +100,67 @@ func insertDebt(db *sql.DB, bal Balances) error {
 	var updateQuery string
 	//If from userId is same -> add
 	if bal.FromUserID == from_user_id && bal.ToUserID == to_user_id {
+		fmt.Println("-->bal + ", amount, from_user_id, to_user_id)
 		amount += bal.Amount
 		updateQuery = `UPDATE BALANCES SET amount=$3 WHERE (from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1);`
+		//if fromuserid is different -> sub
 	} else if bal.FromUserID == to_user_id && bal.ToUserID == from_user_id {
+		fmt.Println("-->bal - ", amount, from_user_id, to_user_id)
 		amount -= bal.Amount
 
 		if amount < 0 {
+			fmt.Println("-->bal - ", amount, from_user_id, to_user_id)
 			amount = -amount
-			updateQuery = `UPDATE BALANACES SET amount=$3 , from_user_id=$2 , to_user_id=$1 WHERE (from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1);`
+			updateQuery = `
+			UPDATE BALANCES
+			SET amount = $3,
+				from_user_id = CASE
+					WHEN from_user_id = $1 THEN $2
+					ELSE from_user_id
+				END,
+				to_user_id = CASE
+					WHEN to_user_id = $2 THEN $1
+					ELSE to_user_id
+				END
+			WHERE (from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1);
+		`
 		} else {
 			updateQuery = `UPDATE BALANCES SET amount=$3 WHERE (from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1);`
 		}
 	}
-
 	_, err = db.Exec(updateQuery, bal.FromUserID, bal.ToUserID, amount)
+	fmt.Println(updateQuery)
 
 	if err != nil {
 		return fmt.Errorf("failed to update debt: %w", err)
 	}
-	//if fromuserid is different -> sub
 
+	err = updateWallet(bal.ToUserID, -bal.Amount)
+
+	if err != nil {
+		return fmt.Errorf("failed to update the balance in wallete: %w", err)
+	}
+
+	return nil
+}
+
+func updateWallet(userid int64, adjustment float64) error {
+	var currentBalance float64
+	querySelect := `SELECT BALANCE FROM Wallets WHERE USER_ID=$1`
+	err := db.DB.QueryRow(querySelect, userid).Scan(&currentBalance)
+	if err != nil {
+		return fmt.Errorf("failed to get current balance: %w", err)
+	}
+
+	totalWalletBalance := currentBalance + adjustment
+	//Update wallete
+	updateWallete := `UPDATE Wallets SET BALANCE=$2 WHERE USER_ID=$1`
+
+	_, err = db.DB.Exec(updateWallete, userid, totalWalletBalance)
+
+	if err != nil {
+		return fmt.Errorf("failed to update wallet: %w", err)
+	}
 	return nil
 }
 
@@ -147,14 +190,17 @@ func (ex *Expense) Save() error {
 	}
 	defer stmt.Close()
 
-	debts := CalculateBalance(ex)
+	debts, adjustment := CalculateBalance(ex)
 
 	for _, debt := range debts {
+		fmt.Print(debts)
 		err := insertDebt(db.DB, debt)
 		if err != nil {
 			log.Fatalf("Error inserting debt: %v", err)
 		}
 	}
+
+	err = updateWallet(ex.AddedBy, adjustment)
 
 	_, err = stmt.Exec(ex.Description, ex.Amount, ex.Currency, ex.Category, ex.AddedAt, ex.IsRecurring, ex.RecurringPeriod, ex.Notes, ex.Groupid, ex.AddedBy)
 	if err != nil {
