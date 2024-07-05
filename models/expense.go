@@ -112,23 +112,15 @@ func insertDebt(db *sql.DB, bal Balances) error {
 			fmt.Println("-->bal - ", amount, from_user_id, to_user_id)
 			amount = -amount
 			updateQuery = `
-			UPDATE BALANCES
-			SET amount = $3,
-				from_user_id = CASE
-					WHEN from_user_id = $1 THEN $2
-					ELSE from_user_id
-				END,
-				to_user_id = CASE
-					WHEN to_user_id = $2 THEN $1
-					ELSE to_user_id
-				END
-			WHERE (from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1);
-		`
+		UPDATE BALANCES
+		SET amount=$3, from_user_id=$2, to_user_id=$1
+		WHERE (from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1);
+	`
 		} else {
 			updateQuery = `UPDATE BALANCES SET amount=$3 WHERE (from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1);`
 		}
 	}
-	_, err = db.Exec(updateQuery, bal.FromUserID, bal.ToUserID, amount)
+	_, err = db.Exec(updateQuery, from_user_id, to_user_id, amount)
 	fmt.Println(updateQuery)
 
 	if err != nil {
