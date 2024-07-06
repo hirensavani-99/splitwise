@@ -27,11 +27,7 @@ type Expense struct {
 	SplitType       string
 }
 
-type Balances struct {
-	FromUserID int64
-	ToUserID   int64
-	Amount     float64
-}
+
 
 func userInGroup(db *sql.DB, userId int64, groupId int64) (bool, error) {
 	var exists bool
