@@ -11,6 +11,7 @@ type Groups struct {
 	Name        string
 	Description string
 	UserIds     []int64 `json:"userIds" binding:"required"`
+	SimplifyDebt  bool
 }
 
 func (g *Groups) Save() (int64, error) {
