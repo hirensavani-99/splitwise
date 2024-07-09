@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"sort"
 	"strconv"
 	"time"
 
@@ -47,7 +48,7 @@ func CalculateBalance(expense *Expense) ([]Balances, float64) {
 	var balances []Balances
 
 	for userId, _ := range expense.AddTo {
-		fmt.Println(userId)
+
 		userID, _ := strconv.ParseInt(userId, 10, 64)
 
 		switch expense.SplitType {
@@ -91,26 +92,22 @@ func insertDebt(db *sql.DB, bal Balances) error {
 			return err
 		}
 
-		err = updateWallet(bal.ToUserID, -bal.Amount)
-		if err != nil {
-			return err
-		}
 		return nil
 	}
 
 	var updateQuery string
 	//If from userId is same -> add
 	if bal.FromUserID == from_user_id && bal.ToUserID == to_user_id {
-		fmt.Println("-->bal + ", amount, from_user_id, to_user_id)
+
 		amount += bal.Amount
 		updateQuery = `UPDATE BALANCES SET amount=$4 WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1)) AND group_id=$3;`
 		//if fromuserid is different -> sub
 	} else if bal.FromUserID == to_user_id && bal.ToUserID == from_user_id {
-		fmt.Println("-->bal - ", amount, from_user_id, to_user_id)
+
 		amount -= bal.Amount
 
 		if amount < 0 {
-			fmt.Println("-->bal - ", amount, from_user_id, to_user_id)
+
 			amount = -amount
 			updateQuery = `
 		UPDATE BALANCES
@@ -122,13 +119,10 @@ func insertDebt(db *sql.DB, bal Balances) error {
 		}
 	}
 	_, err = db.Exec(updateQuery, from_user_id, to_user_id, group_id, amount)
-	fmt.Println(updateQuery)
 
 	if err != nil {
 		return fmt.Errorf("failed to update debt: %w", err)
 	}
-
-	err = updateWallet(bal.ToUserID, -bal.Amount)
 
 	if err != nil {
 		return fmt.Errorf("failed to update the balance in wallete: %w", err)
@@ -171,7 +165,7 @@ func (ex *Expense) Save() error {
 
 	query := `
 		INSERT INTO expense (
-			description, amount, currency, category, added_at, 
+			description, amount, currency, category, added_at,
 			is_recurring, recurring_period, notes, group_id, added_by
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
@@ -185,15 +179,55 @@ func (ex *Expense) Save() error {
 
 	debts, adjustment := CalculateBalance(ex)
 
-	for _, debt := range debts {
-		fmt.Print(debts)
-		err := insertDebt(db.DB, debt)
+	var simplifyDebt bool
+	queryToGetGroupType := `Select simplify_debt from groups where id=$1 `
+
+	err = db.DB.QueryRow(queryToGetGroupType, ex.Groupid).Scan(&simplifyDebt)
+
+	if err != nil {
+		return fmt.Errorf("error getting group type: %w", err)
+	}
+
+	if simplifyDebt {
+
+		res, err := getBalanacesForGroup(ex.Groupid)
+		fmt.Println("res->", res)
+		res = append(res, debts...)
 		if err != nil {
-			log.Fatalf("Error inserting debt: %v", err)
+			return fmt.Errorf("error geathering balances : %w", err)
+		}
+		fmt.Println("res->2", res)
+		netBalances := calculateNetBalances(res)
+		fmt.Println(netBalances)
+		debtors, creditors := separateDebtorsAndCreditors(netBalances)
+		fmt.Println(debtors, creditors)
+		minimizeTransactions(debtors, creditors, netBalances, ex.Groupid)
+	} else {
+
+		for _, debt := range debts {
+
+			err := insertDebt(db.DB, debt)
+			if err != nil {
+				log.Fatalf("Error inserting debt: %v", err)
+			}
 		}
 	}
 
+	//updating wallete for debtors
+
+	for _, debt := range debts {
+
+		err = updateWallet(debt.ToUserID, -debt.Amount)
+		if err != nil {
+			return fmt.Errorf("error updating wallet for debtors: %w", err)
+		}
+	}
+
+	//updating wallet for creditors
 	err = updateWallet(ex.AddedBy, adjustment)
+	if err != nil {
+		return fmt.Errorf("error updating wallet: %w", err)
+	}
 
 	_, err = stmt.Exec(ex.Description, ex.Amount, ex.Currency, ex.Category, ex.AddedAt, ex.IsRecurring, ex.RecurringPeriod, ex.Notes, ex.Groupid, ex.AddedBy)
 	if err != nil {
@@ -202,4 +236,107 @@ func (ex *Expense) Save() error {
 
 	return nil
 
+}
+
+func getBalanacesForGroup(groupid int64) ([]Balances, error) {
+	balance := Balances{}
+	balances := []Balances{}
+
+	query := `Select from_user_id , to_user_id , group_id , amount from balances where group_id=$1`
+
+	rows, err := db.DB.Query(query, groupid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query balances: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		err = rows.Scan(&balance.FromUserID, &balance.ToUserID, &balance.GroupId, &balance.Amount)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		fmt.Println(balance.Amount)
+		balances = append(balances, balance)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over rows: %w", err)
+	}
+	return balances, nil
+}
+
+func calculateNetBalances(transcations []Balances) map[int64]float64 {
+	netBalance := make(map[int64]float64)
+
+	for _, t := range transcations {
+		netBalance[t.FromUserID] += t.Amount
+		netBalance[t.ToUserID] -= t.Amount
+	}
+
+	return netBalance
+}
+
+func separateDebtorsAndCreditors(netBalances map[int64]float64) ([]int64, []int64) {
+	creditors := []int64{}
+	debtors := []int64{}
+
+	for userId, amount := range netBalances {
+		if amount > 0 {
+			creditors = append(creditors, userId)
+		} else if amount < 0 {
+			debtors = append(debtors, userId)
+		}
+	}
+
+	sort.Slice(creditors, func(i, j int) bool {
+		return netBalances[creditors[i]] > netBalances[creditors[j]]
+	})
+
+	sort.Slice(debtors, func(i, j int) bool {
+		return netBalances[debtors[i]] < netBalances[debtors[j]]
+	})
+
+	return creditors, debtors
+}
+
+func minimizeTransactions(debtors []int64, creditors []int64, netBalances map[int64]float64, groupId int64) {
+	i, j := 0, 0
+
+	for i < len(creditors) && j < len(debtors) {
+
+		debtAmount := netBalances[debtors[j]]
+		creditAmount := netBalances[creditors[i]]
+
+		settleAmount := min(debtAmount, creditAmount)
+		fmt.Println(netBalances)
+		netBalances[debtors[j]] += settleAmount
+		netBalances[creditors[i]] -= settleAmount
+		fmt.Println(netBalances)
+		var debt Balances
+		debt.FromUserID = debtors[j]
+		debt.ToUserID = creditors[i]
+		debt.GroupId = groupId
+		debt.Amount = -settleAmount
+
+		fmt.Printf("User %d pays User %d: %.2f\n", debtors[j], creditors[i], settleAmount)
+		err := insertDebt(db.DB, debt)
+		if err != nil {
+			log.Fatalf("Error inserting debt: %v", err)
+		}
+
+		if netBalances[creditors[i]] == 0 {
+			i++
+		}
+
+		if netBalances[debtors[j]] == 0 {
+			j++
+		}
+	}
+}
+
+func min(a, b float64) float64 {
+	if a < b {
+		return a
+	}
+	return b
 }

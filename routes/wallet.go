@@ -17,5 +17,10 @@ func getWalletById(context *gin.Context) {
 
 	walleteData, err := models.GetWallet(userId)
 
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "issue returning wallet", "err": err})
+		return
+	}
+
 	context.JSON(http.StatusOK, gin.H{"wallet": walleteData})
 }

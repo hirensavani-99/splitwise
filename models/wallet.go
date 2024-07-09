@@ -51,13 +51,14 @@ func (wallet *Wallet) Save() error {
 func GetWallet(userID int64) (*Wallet, error) {
 	wallet := &Wallet{}
 	query := `
-		SELECT user_id, balance, currency, created_at, updated_at
+		SELECT user_id, balance, currency, createdAt, updatedAt
 		FROM wallets
 		WHERE user_id = $1
 	`
 
 	row := db.DB.QueryRow(query, userID)
 	err := row.Scan(&wallet.UserID, &wallet.Balance, &wallet.Currency, &wallet.CreatedAt, &wallet.UpdatedAt)
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("wallet not found for user_id: %d", userID)
@@ -76,7 +77,7 @@ func GetWallet(userID int64) (*Wallet, error) {
 
 func getBalancesForUser(userID int64) (map[int64]float64, error) {
 	balances := make(map[int64]float64)
-	query := `
+	query := `	
 		SELECT from_user_id, to_user_id, amount
 		FROM Balances
 		WHERE from_user_id = $1 OR to_user_id = $1
