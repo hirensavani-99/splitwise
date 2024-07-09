@@ -9,7 +9,6 @@ import (
 )
 
 type Wallet struct {
-	ID        int64
 	UserID    int64
 	Balance   float64
 	Currency  string
@@ -21,6 +20,7 @@ type Wallet struct {
 type Balances struct {
 	FromUserID int64
 	ToUserID   int64
+	GroupId    int64
 	Amount     float64
 }
 
@@ -31,8 +31,8 @@ func (wallet *Wallet) Save() error {
 			user_id, balance, currency
 		) VALUES (
 			$1, $2, $3
-		) RETURNING id`
-
+		)`
+	fmt.Println(wallet)
 	stmt, err := db.DB.Prepare(query)
 	if err != nil {
 		return fmt.Errorf("error preparing query: %w", err)
@@ -51,13 +51,13 @@ func (wallet *Wallet) Save() error {
 func GetWallet(userID int64) (*Wallet, error) {
 	wallet := &Wallet{}
 	query := `
-		SELECT id, user_id, balance, currency, created_at, updated_at
+		SELECT user_id, balance, currency, created_at, updated_at
 		FROM wallets
 		WHERE user_id = $1
 	`
 
 	row := db.DB.QueryRow(query, userID)
-	err := row.Scan(&wallet.ID, &wallet.UserID, &wallet.Balance, &wallet.Currency, &wallet.CreatedAt, &wallet.UpdatedAt)
+	err := row.Scan(&wallet.UserID, &wallet.Balance, &wallet.Currency, &wallet.CreatedAt, &wallet.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("wallet not found for user_id: %d", userID)

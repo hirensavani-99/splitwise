@@ -26,9 +26,9 @@ func signUp(context *gin.Context) {
 		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not save user.", "err": err})
 		return
 	}
-
+	fmt.Println("userid--->", userId)
 	res := models.NewWallet(userId, 0.0, "CAD")
-
+	fmt.Println("--->", res)
 	err = res.Save()
 	fmt.Println(err)
 

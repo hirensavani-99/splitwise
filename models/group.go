@@ -7,17 +7,17 @@ import (
 )
 
 type Groups struct {
-	ID          int64
-	Name        string
-	Description string
-	UserIds     []int64 `json:"userIds" binding:"required"`
-	SimplifyDebt  bool
+	ID           int64
+	Name         string
+	Description  string
+	UserIds      []int64 `json:"userIds" binding:"required"`
+	SimplifyDebt bool
 }
 
 func (g *Groups) Save() (int64, error) {
 
 	var groupId int64
-	query := "INSERT INTO groups (name,description) VALUES ($1, $2) RETURNING id"
+	query := "INSERT INTO groups (name,description,simplify_debt) VALUES ($1, $2,$3) RETURNING id"
 
 	stmt, err := db.DB.Prepare(query)
 	if err != nil {
@@ -25,12 +25,10 @@ func (g *Groups) Save() (int64, error) {
 	}
 	defer stmt.Close()
 
-	err = stmt.QueryRow(g.Name, g.Description).Scan(&groupId)
+	err = stmt.QueryRow(g.Name, g.Description, g.SimplifyDebt).Scan(&groupId)
 	if err != nil {
 		return 0, err
 	}
-
-	fmt.Println(groupId)
 
 	return groupId, nil
 

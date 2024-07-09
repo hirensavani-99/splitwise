@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS groups (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     description TEXT,
-    simplify_debt bool
+    simplify_debt BOOLEAN DEFAULT FALSE
 );
 
 
@@ -40,13 +40,18 @@ CREATE TABLE IF NOT EXISTS Wallets (
     Currency VARCHAR(10) NOT NULL,
     CreatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UpdatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS Balances(
             id SERIAL PRIMARY KEY,
-            from_user_id BIGINT NOT NULL,
-            to_user_id BIGINT NOT NULL,
+            from_user_id INT NOT NULL,
+            to_user_id INT NOT NULL,
+            group_id INT NOT NULL,
             amount FLOAT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (from_user_id) REFERENCES users(id),
+            FOREIGN kEY (to_user_id) REFERENCES Users(id),
+            FOREIGN KEY (group_id) REFERENCES groups(id)
+
 );

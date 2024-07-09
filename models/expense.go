@@ -27,8 +27,6 @@ type Expense struct {
 	SplitType       string
 }
 
-
-
 func userInGroup(db *sql.DB, userId int64, groupId int64) (bool, error) {
 	var exists bool
 	query := `SELECT EXISTS (SELECT 1 FROM group_member WHERE user_id = $1 AND group_id = $2)`
@@ -64,6 +62,7 @@ func CalculateBalance(expense *Expense) ([]Balances, float64) {
 			balances = append(balances, Balances{
 				FromUserID: expense.AddedBy,
 				ToUserID:   userID,
+				GroupId:    expense.Groupid,
 				Amount:     amountPerUser,
 			})
 
@@ -77,16 +76,22 @@ func insertDebt(db *sql.DB, bal Balances) error {
 	var amount float64
 	var from_user_id int64
 	var to_user_id int64
-	queryToGetExistingRecord := `SELECT from_user_id, to_user_id, amount FROM BALANCES WHERE (from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1);`
+	var group_id int64
+	queryToGetExistingRecord := `SELECT from_user_id, to_user_id, amount , group_id FROM BALANCES WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1)) AND group_id=$3;`
 
-	err := db.QueryRow(queryToGetExistingRecord, bal.FromUserID, bal.ToUserID).Scan(&from_user_id, &to_user_id, &amount)
+	err := db.QueryRow(queryToGetExistingRecord, bal.FromUserID, bal.ToUserID, bal.GroupId).Scan(&from_user_id, &to_user_id, &amount, &group_id)
 	if err != nil {
 		query := `
-        INSERT INTO BALANCES (from_user_id, to_user_id, amount, created_at)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO BALANCES (from_user_id, to_user_id ,group_id, amount, created_at)
+        VALUES ($1, $2, $3, $4,$5)
     `
 
-		_, err = db.Exec(query, bal.FromUserID, bal.ToUserID, bal.Amount, time.Now())
+		_, err = db.Exec(query, bal.FromUserID, bal.ToUserID, bal.GroupId, bal.Amount, time.Now())
+		if err != nil {
+			return err
+		}
+
+		err = updateWallet(bal.ToUserID, -bal.Amount)
 		if err != nil {
 			return err
 		}
@@ -98,7 +103,7 @@ func insertDebt(db *sql.DB, bal Balances) error {
 	if bal.FromUserID == from_user_id && bal.ToUserID == to_user_id {
 		fmt.Println("-->bal + ", amount, from_user_id, to_user_id)
 		amount += bal.Amount
-		updateQuery = `UPDATE BALANCES SET amount=$3 WHERE (from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1);`
+		updateQuery = `UPDATE BALANCES SET amount=$4 WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1)) AND group_id=$3;`
 		//if fromuserid is different -> sub
 	} else if bal.FromUserID == to_user_id && bal.ToUserID == from_user_id {
 		fmt.Println("-->bal - ", amount, from_user_id, to_user_id)
@@ -109,14 +114,14 @@ func insertDebt(db *sql.DB, bal Balances) error {
 			amount = -amount
 			updateQuery = `
 		UPDATE BALANCES
-		SET amount=$3, from_user_id=$2, to_user_id=$1
-		WHERE (from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1);
+		SET amount=$4, from_user_id=$2, to_user_id=$1
+		WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1) AND group_id=$3);
 	`
 		} else {
-			updateQuery = `UPDATE BALANCES SET amount=$3 WHERE (from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1);`
+			updateQuery = `UPDATE BALANCES SET amount=$4 WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1) AND group_id=$3);`
 		}
 	}
-	_, err = db.Exec(updateQuery, from_user_id, to_user_id, amount)
+	_, err = db.Exec(updateQuery, from_user_id, to_user_id, group_id, amount)
 	fmt.Println(updateQuery)
 
 	if err != nil {
