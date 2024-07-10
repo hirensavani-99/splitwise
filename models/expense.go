@@ -73,7 +73,7 @@ func CalculateBalance(expense *Expense) ([]Balances, float64) {
 	return balances, payerPayBackAmount
 }
 
-func insertDebt(db *sql.DB, bal Balances) error {
+func insertDebt(db *sql.DB, bal Balances, isCalculated bool) error {
 	var amount float64
 	var from_user_id int64
 	var to_user_id int64
@@ -97,25 +97,37 @@ func insertDebt(db *sql.DB, bal Balances) error {
 
 	var updateQuery string
 	//If from userId is same -> add
-	if bal.FromUserID == from_user_id && bal.ToUserID == to_user_id {
 
-		amount += bal.Amount
-		updateQuery = `UPDATE BALANCES SET amount=$4 WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1)) AND group_id=$3;`
-		//if fromuserid is different -> sub
-	} else if bal.FromUserID == to_user_id && bal.ToUserID == from_user_id {
+	if isCalculated {
+		fmt.Println("---> amount", bal)
+		amount = bal.Amount
+		if bal.Amount > 0 {
+			updateQuery = `UPDATE BALANCES SET amount=$4 WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1)) AND group_id=$3;`
+		} else {
+			updateQuery = `UPDATE BALANCES SET amount=$4 WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1) AND group_id=$3);`
+		}
+	} else {
 
-		amount -= bal.Amount
+		if bal.FromUserID == from_user_id && bal.ToUserID == to_user_id {
 
-		if amount < 0 {
+			amount += bal.Amount
+			updateQuery = `UPDATE BALANCES SET amount=$4 WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1)) AND group_id=$3;`
+			//if fromuserid is different -> sub
+		} else if bal.FromUserID == to_user_id && bal.ToUserID == from_user_id {
 
-			amount = -amount
-			updateQuery = `
+			amount -= bal.Amount
+
+			if amount < 0 {
+
+				amount = -amount
+				updateQuery = `
 		UPDATE BALANCES
 		SET amount=$4, from_user_id=$2, to_user_id=$1
 		WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1) AND group_id=$3);
 	`
-		} else {
-			updateQuery = `UPDATE BALANCES SET amount=$4 WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1) AND group_id=$3);`
+			} else {
+				updateQuery = `UPDATE BALANCES SET amount=$4 WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1) AND group_id=$3);`
+			}
 		}
 	}
 	_, err = db.Exec(updateQuery, from_user_id, to_user_id, group_id, amount)
@@ -191,22 +203,21 @@ func (ex *Expense) Save() error {
 	if simplifyDebt {
 
 		res, err := getBalanacesForGroup(ex.Groupid)
-		fmt.Println("res->", res)
+
 		res = append(res, debts...)
 		if err != nil {
 			return fmt.Errorf("error geathering balances : %w", err)
 		}
-		fmt.Println("res->2", res)
 		netBalances := calculateNetBalances(res)
-		fmt.Println(netBalances)
+
 		debtors, creditors := separateDebtorsAndCreditors(netBalances)
-		fmt.Println(debtors, creditors)
+
 		minimizeTransactions(debtors, creditors, netBalances, ex.Groupid)
 	} else {
 
 		for _, debt := range debts {
 
-			err := insertDebt(db.DB, debt)
+			err := insertDebt(db.DB, debt, false)
 			if err != nil {
 				log.Fatalf("Error inserting debt: %v", err)
 			}
@@ -214,7 +225,6 @@ func (ex *Expense) Save() error {
 	}
 
 	//updating wallete for debtors
-
 	for _, debt := range debts {
 
 		err = updateWallet(debt.ToUserID, -debt.Amount)
@@ -255,7 +265,7 @@ func getBalanacesForGroup(groupid int64) ([]Balances, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
-		fmt.Println(balance.Amount)
+
 		balances = append(balances, balance)
 	}
 
@@ -308,10 +318,10 @@ func minimizeTransactions(debtors []int64, creditors []int64, netBalances map[in
 		creditAmount := netBalances[creditors[i]]
 
 		settleAmount := min(debtAmount, creditAmount)
-		fmt.Println(netBalances)
+
 		netBalances[debtors[j]] += settleAmount
 		netBalances[creditors[i]] -= settleAmount
-		fmt.Println(netBalances)
+
 		var debt Balances
 		debt.FromUserID = debtors[j]
 		debt.ToUserID = creditors[i]
@@ -319,7 +329,7 @@ func minimizeTransactions(debtors []int64, creditors []int64, netBalances map[in
 		debt.Amount = -settleAmount
 
 		fmt.Printf("User %d pays User %d: %.2f\n", debtors[j], creditors[i], settleAmount)
-		err := insertDebt(db.DB, debt)
+		err := insertDebt(db.DB, debt, true)
 		if err != nil {
 			log.Fatalf("Error inserting debt: %v", err)
 		}
