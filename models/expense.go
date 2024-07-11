@@ -6,6 +6,7 @@ import (
 	"log"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"hirensavani.com/db"
@@ -99,7 +100,7 @@ func insertDebt(db *sql.DB, bal Balances, isCalculated bool) error {
 	//If from userId is same -> add
 
 	if isCalculated {
-		fmt.Println("---> amount", bal)
+
 		amount = bal.Amount
 		if bal.Amount > 0 {
 			updateQuery = `UPDATE BALANCES SET amount=$4 WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1)) AND group_id=$3;`
@@ -205,14 +206,21 @@ func (ex *Expense) Save() error {
 		res, err := getBalanacesForGroup(ex.Groupid)
 
 		res = append(res, debts...)
+
+		
 		if err != nil {
 			return fmt.Errorf("error geathering balances : %w", err)
 		}
 		netBalances := calculateNetBalances(res)
+		
+		creditors, debtors := separateDebtorsAndCreditors(netBalances)
 
-		debtors, creditors := separateDebtorsAndCreditors(netBalances)
+		balances := minimizeTransactions(debtors, creditors, netBalances, ex.Groupid)
 
-		minimizeTransactions(debtors, creditors, netBalances, ex.Groupid)
+		err = deleteOtherRecords(balances, ex.Groupid)
+		if err != nil {
+			log.Fatalf("Error deleting balances: %v", err)
+		}
 	} else {
 
 		for _, debt := range debts {
@@ -309,26 +317,37 @@ func separateDebtorsAndCreditors(netBalances map[int64]float64) ([]int64, []int6
 	return creditors, debtors
 }
 
-func minimizeTransactions(debtors []int64, creditors []int64, netBalances map[int64]float64, groupId int64) {
+func minimizeTransactions(debtors []int64, creditors []int64, netBalances map[int64]float64, groupId int64) []Balances {
+	
+	
 	i, j := 0, 0
 
-	for i < len(creditors) && j < len(debtors) {
+	overAllBalances := []Balances{}
 
-		debtAmount := netBalances[debtors[j]]
+	for i < len(creditors) && j < len(debtors) {
+		debtAmount := -netBalances[debtors[j]]
 		creditAmount := netBalances[creditors[i]]
 
+		
+
 		settleAmount := min(debtAmount, creditAmount)
+
+	
 
 		netBalances[debtors[j]] += settleAmount
 		netBalances[creditors[i]] -= settleAmount
 
-		var debt Balances
-		debt.FromUserID = debtors[j]
-		debt.ToUserID = creditors[i]
-		debt.GroupId = groupId
-		debt.Amount = -settleAmount
+		
 
-		fmt.Printf("User %d pays User %d: %.2f\n", debtors[j], creditors[i], settleAmount)
+		var debt Balances
+		debt.FromUserID = creditors[i]
+		debt.ToUserID = debtors[j]
+		debt.GroupId = groupId
+		debt.Amount = settleAmount
+
+		overAllBalances = append(overAllBalances, debt)
+
+		
 		err := insertDebt(db.DB, debt, true)
 		if err != nil {
 			log.Fatalf("Error inserting debt: %v", err)
@@ -342,6 +361,7 @@ func minimizeTransactions(debtors []int64, creditors []int64, netBalances map[in
 			j++
 		}
 	}
+	return overAllBalances
 }
 
 func min(a, b float64) float64 {
@@ -349,4 +369,28 @@ func min(a, b float64) float64 {
 		return a
 	}
 	return b
+}
+
+func deleteOtherRecords(keepRecords []Balances, groupId int64) error {
+	// Construct the SQL query
+	query := `
+        DELETE  FROM balances
+        WHERE group_id = $1
+        AND (from_user_id, to_user_id, group_id, amount) NOT IN `
+
+	var records []string
+	for _, record := range keepRecords {
+		tuple := fmt.Sprintf("(%d,%d,%d,%f)", record.FromUserID, record.ToUserID, record.GroupId, record.Amount)
+		records = append(records, tuple)
+	}
+
+	query = query + "(" + strings.Join(records, ",") + ")"
+	// Execute the DELETE statement
+	
+	_, err := db.DB.Exec(query, groupId)
+	if err != nil {
+		return fmt.Errorf("failed to delete records: %w", err)
+	}
+
+	return nil
 }
