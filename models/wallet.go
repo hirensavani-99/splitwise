@@ -4,8 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
-
-	"hirensavani.com/db"
 )
 
 type Wallet struct {
@@ -24,7 +22,7 @@ type Balances struct {
 	Amount     float64
 }
 
-func (wallet *Wallet) Save() error {
+func (wallet *Wallet) Save(db *sql.DB) error {
 
 	query := `
 		INSERT INTO wallets (
@@ -33,7 +31,7 @@ func (wallet *Wallet) Save() error {
 			$1, $2, $3
 		)`
 	fmt.Println(wallet)
-	stmt, err := db.DB.Prepare(query)
+	stmt, err := db.Prepare(query)
 	if err != nil {
 		return fmt.Errorf("error preparing query: %w", err)
 	}
@@ -48,34 +46,34 @@ func (wallet *Wallet) Save() error {
 
 }
 
-func GetWallet(userID int64) (*Wallet, error) {
-	wallet := &Wallet{}
+func (wallet *Wallet) Get(db *sql.DB, userID int64) error {
+
 	query := `
 		SELECT user_id, balance, currency, createdAt, updatedAt
 		FROM wallets
 		WHERE user_id = $1
 	`
 
-	row := db.DB.QueryRow(query, userID)
+	row := db.QueryRow(query, userID)
 	err := row.Scan(&wallet.UserID, &wallet.Balance, &wallet.Currency, &wallet.CreatedAt, &wallet.UpdatedAt)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("wallet not found for user_id: %d", userID)
+			return fmt.Errorf("wallet not found for user_id: %d", userID)
 		}
-		return nil, fmt.Errorf("failed to query wallet: %w", err)
+		return fmt.Errorf("failed to query wallet: %w", err)
 	}
 
 	// Initialize the Balances map
-	wallet.Balances, err = getBalancesForUser(userID)
+	wallet.Balances, err = getBalancesForUser(db, userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get balances for user: %w", err)
+		return fmt.Errorf("failed to get balances for user: %w", err)
 	}
 
-	return wallet, nil
+	return nil
 }
 
-func getBalancesForUser(userID int64) (map[int64]float64, error) {
+func getBalancesForUser(db *sql.DB, userID int64) (map[int64]float64, error) {
 	balances := make(map[int64]float64)
 	query := `	
 		SELECT from_user_id, to_user_id, amount
@@ -83,7 +81,7 @@ func getBalancesForUser(userID int64) (map[int64]float64, error) {
 		WHERE from_user_id = $1 OR to_user_id = $1
 	`
 
-	rows, err := db.DB.Query(query, userID)
+	rows, err := db.Query(query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query balances: %w", err)
 	}
@@ -109,6 +107,26 @@ func getBalancesForUser(userID int64) (map[int64]float64, error) {
 	}
 
 	return balances, nil
+}
+
+func updateWallet(db *sql.DB, userid int64, adjustment float64) error {
+	var currentBalance float64
+	querySelect := `SELECT BALANCE FROM Wallets WHERE USER_ID=$1`
+	err := db.QueryRow(querySelect, userid).Scan(&currentBalance)
+	if err != nil {
+		return fmt.Errorf("failed to get current balance: %w", err)
+	}
+
+	totalWalletBalance := currentBalance + adjustment
+	//Update wallete
+	updatedWallet := `UPDATE Wallets SET BALANCE=$2 WHERE USER_ID=$1`
+
+	_, err = db.Exec(updatedWallet, userid, totalWalletBalance)
+
+	if err != nil {
+		return fmt.Errorf("failed to update wallet: %w", err)
+	}
+	return nil
 }
 
 func NewWallet(userId int64, balance float64, currency string) Wallet {

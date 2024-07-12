@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"hirensavani.com/db"
 	"hirensavani.com/models"
 )
 
@@ -14,13 +15,13 @@ func getWalletById(context *gin.Context) {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Invalid userId"})
 		return
 	}
-
-	walleteData, err := models.GetWallet(userId)
+	wallet := &models.Wallet{}
+	err = wallet.Get(db.DB, userId)
 
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "issue returning wallet", "err": err})
 		return
 	}
 
-	context.JSON(http.StatusOK, gin.H{"wallet": walleteData})
+	context.JSON(http.StatusOK, gin.H{"wallet": wallet})
 }

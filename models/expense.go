@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -144,26 +145,6 @@ func insertDebt(db *sql.DB, bal Balances, isCalculated bool) error {
 	return nil
 }
 
-func updateWallet(userid int64, adjustment float64) error {
-	var currentBalance float64
-	querySelect := `SELECT BALANCE FROM Wallets WHERE USER_ID=$1`
-	err := db.DB.QueryRow(querySelect, userid).Scan(&currentBalance)
-	if err != nil {
-		return fmt.Errorf("failed to get current balance: %w", err)
-	}
-
-	totalWalletBalance := currentBalance + adjustment
-	//Update wallete
-	updateWallete := `UPDATE Wallets SET BALANCE=$2 WHERE USER_ID=$1`
-
-	_, err = db.DB.Exec(updateWallete, userid, totalWalletBalance)
-
-	if err != nil {
-		return fmt.Errorf("failed to update wallet: %w", err)
-	}
-	return nil
-}
-
 func (ex *Expense) Save() error {
 
 	isMember, err := userInGroup(db.DB, ex.AddedBy, ex.Groupid)
@@ -207,12 +188,11 @@ func (ex *Expense) Save() error {
 
 		res = append(res, debts...)
 
-		
 		if err != nil {
 			return fmt.Errorf("error geathering balances : %w", err)
 		}
 		netBalances := calculateNetBalances(res)
-		
+
 		creditors, debtors := separateDebtorsAndCreditors(netBalances)
 
 		balances := minimizeTransactions(debtors, creditors, netBalances, ex.Groupid)
@@ -235,14 +215,14 @@ func (ex *Expense) Save() error {
 	//updating wallete for debtors
 	for _, debt := range debts {
 
-		err = updateWallet(debt.ToUserID, -debt.Amount)
+		err = updateWallet(db.DB, debt.ToUserID, -debt.Amount)
 		if err != nil {
 			return fmt.Errorf("error updating wallet for debtors: %w", err)
 		}
 	}
 
 	//updating wallet for creditors
-	err = updateWallet(ex.AddedBy, adjustment)
+	err = updateWallet(db.DB, ex.AddedBy, adjustment)
 	if err != nil {
 		return fmt.Errorf("error updating wallet: %w", err)
 	}
@@ -318,8 +298,7 @@ func separateDebtorsAndCreditors(netBalances map[int64]float64) ([]int64, []int6
 }
 
 func minimizeTransactions(debtors []int64, creditors []int64, netBalances map[int64]float64, groupId int64) []Balances {
-	
-	
+
 	i, j := 0, 0
 
 	overAllBalances := []Balances{}
@@ -328,16 +307,10 @@ func minimizeTransactions(debtors []int64, creditors []int64, netBalances map[in
 		debtAmount := -netBalances[debtors[j]]
 		creditAmount := netBalances[creditors[i]]
 
-		
-
-		settleAmount := min(debtAmount, creditAmount)
-
-	
+		settleAmount := math.Min(debtAmount, creditAmount)
 
 		netBalances[debtors[j]] += settleAmount
 		netBalances[creditors[i]] -= settleAmount
-
-		
 
 		var debt Balances
 		debt.FromUserID = creditors[i]
@@ -347,7 +320,7 @@ func minimizeTransactions(debtors []int64, creditors []int64, netBalances map[in
 
 		overAllBalances = append(overAllBalances, debt)
 
-		
+		fmt.Printf("User %d pays User %d: %.2f\n", creditors[i], debtors[j], settleAmount)
 		err := insertDebt(db.DB, debt, true)
 		if err != nil {
 			log.Fatalf("Error inserting debt: %v", err)
@@ -362,13 +335,6 @@ func minimizeTransactions(debtors []int64, creditors []int64, netBalances map[in
 		}
 	}
 	return overAllBalances
-}
-
-func min(a, b float64) float64 {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func deleteOtherRecords(keepRecords []Balances, groupId int64) error {
@@ -386,7 +352,7 @@ func deleteOtherRecords(keepRecords []Balances, groupId int64) error {
 
 	query = query + "(" + strings.Join(records, ",") + ")"
 	// Execute the DELETE statement
-	
+
 	_, err := db.DB.Exec(query, groupId)
 	if err != nil {
 		return fmt.Errorf("failed to delete records: %w", err)

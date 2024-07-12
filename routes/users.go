@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"hirensavani.com/db"
 	"hirensavani.com/models"
 )
 
@@ -26,10 +27,8 @@ func signUp(context *gin.Context) {
 		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not save user.", "err": err})
 		return
 	}
-	fmt.Println("userid--->", userId)
 	res := models.NewWallet(userId, 0.0, "CAD")
-	fmt.Println("--->", res)
-	err = res.Save()
+	err = res.Save(db.DB)
 	fmt.Println(err)
 
 	if err != nil {
