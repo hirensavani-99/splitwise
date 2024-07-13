@@ -7,6 +7,10 @@ import (
 	"hirensavani.com/utils"
 )
 
+type Saver interface {
+	save() (int64, error)
+}
+
 // User model
 type User struct {
 	ID       int64

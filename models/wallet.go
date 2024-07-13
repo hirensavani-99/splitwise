@@ -15,13 +15,6 @@ type Wallet struct {
 	UpdatedAt time.Time
 }
 
-type Balances struct {
-	FromUserID int64
-	ToUserID   int64
-	GroupId    int64
-	Amount     float64
-}
-
 func (wallet *Wallet) Save(db *sql.DB) error {
 
 	query := `
@@ -64,8 +57,9 @@ func (wallet *Wallet) Get(db *sql.DB, userID int64) error {
 		return fmt.Errorf("failed to query wallet: %w", err)
 	}
 
+	balances := &Balances{}
 	// Initialize the Balances map
-	wallet.Balances, err = getBalancesForUser(db, userID)
+	wallet.Balances, err = balances.Get(db, userID)
 	if err != nil {
 		return fmt.Errorf("failed to get balances for user: %w", err)
 	}
@@ -73,58 +67,35 @@ func (wallet *Wallet) Get(db *sql.DB, userID int64) error {
 	return nil
 }
 
-func getBalancesForUser(db *sql.DB, userID int64) (map[int64]float64, error) {
-	balances := make(map[int64]float64)
-	query := `	
-		SELECT from_user_id, to_user_id, amount
-		FROM Balances
-		WHERE from_user_id = $1 OR to_user_id = $1
-	`
+func (wallet *Wallet) Update(db *sql.DB, userid int64, adjustment float64) error {
+	tx, err := db.Begin()
 
-	rows, err := db.Query(query, userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query balances: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var fromUser int64
-		var toUser int64
-		var amount float64
-		if err := rows.Scan(&fromUser, &toUser, &amount); err != nil {
-			return nil, fmt.Errorf("failed to scan row: %w", err)
-		}
-
-		if fromUser != userID {
-			balances[fromUser] = -amount
-		} else {
-			balances[toUser] = amount
-		}
+		return fmt.Errorf("Failed to begin transcations %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating over rows: %w", err)
-	}
-
-	return balances, nil
-}
-
-func updateWallet(db *sql.DB, userid int64, adjustment float64) error {
-	var currentBalance float64
 	querySelect := `SELECT BALANCE FROM Wallets WHERE USER_ID=$1`
-	err := db.QueryRow(querySelect, userid).Scan(&currentBalance)
+	err = db.QueryRow(querySelect, userid).Scan(&wallet.Balance)
 	if err != nil {
+		tx.Rollback()
 		return fmt.Errorf("failed to get current balance: %w", err)
 	}
 
-	totalWalletBalance := currentBalance + adjustment
+	wallet.Balance += adjustment
+	wallet.UpdatedAt = time.Now()
 	//Update wallete
-	updatedWallet := `UPDATE Wallets SET BALANCE=$2 WHERE USER_ID=$1`
+	updatedWallet := `UPDATE Wallets SET BALANCE=$2 , updatedAt=$3 WHERE USER_ID=$1`
 
-	_, err = db.Exec(updatedWallet, userid, totalWalletBalance)
+	_, err = db.Exec(updatedWallet, userid, wallet.Balance, wallet.UpdatedAt)
 
 	if err != nil {
+		tx.Rollback()
 		return fmt.Errorf("failed to update wallet: %w", err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transcations.")
 	}
 	return nil
 }

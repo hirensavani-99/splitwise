@@ -214,15 +214,16 @@ func (ex *Expense) Save() error {
 
 	//updating wallete for debtors
 	for _, debt := range debts {
+		wallet := &Wallet{}
 
-		err = updateWallet(db.DB, debt.ToUserID, -debt.Amount)
+		err = wallet.Update(db.DB, debt.ToUserID, -debt.Amount)
 		if err != nil {
 			return fmt.Errorf("error updating wallet for debtors: %w", err)
 		}
 	}
-
+	wallet := &Wallet{}
 	//updating wallet for creditors
-	err = updateWallet(db.DB, ex.AddedBy, adjustment)
+	err = wallet.Update(db.DB, ex.AddedBy, adjustment)
 	if err != nil {
 		return fmt.Errorf("error updating wallet: %w", err)
 	}
