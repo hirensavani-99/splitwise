@@ -80,16 +80,11 @@ func insertDebt(db *sql.DB, bal Balances, isCalculated bool) error {
 	var from_user_id int64
 	var to_user_id int64
 	var group_id int64
-	queryToGetExistingRecord := `SELECT from_user_id, to_user_id, amount , group_id FROM BALANCES WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1)) AND group_id=$3;`
 
-	err := db.QueryRow(queryToGetExistingRecord, bal.FromUserID, bal.ToUserID, bal.GroupId).Scan(&from_user_id, &to_user_id, &amount, &group_id)
+	err := db.QueryRow(QueryToGetExistingBalances, bal.FromUserID, bal.ToUserID, bal.GroupId).Scan(&from_user_id, &to_user_id, &amount, &group_id)
 	if err != nil {
-		query := `
-        INSERT INTO BALANCES (from_user_id, to_user_id ,group_id, amount, created_at)
-        VALUES ($1, $2, $3, $4,$5)
-    `
 
-		_, err = db.Exec(query, bal.FromUserID, bal.ToUserID, bal.GroupId, bal.Amount, time.Now())
+		_, err = db.Exec(QueryToPostBalances, bal.FromUserID, bal.ToUserID, bal.GroupId, bal.Amount, time.Now())
 		if err != nil {
 			return err
 		}
@@ -103,17 +98,14 @@ func insertDebt(db *sql.DB, bal Balances, isCalculated bool) error {
 	if isCalculated {
 
 		amount = bal.Amount
-		if bal.Amount > 0 {
-			updateQuery = `UPDATE BALANCES SET amount=$4 WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1)) AND group_id=$3;`
-		} else {
-			updateQuery = `UPDATE BALANCES SET amount=$4 WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1) AND group_id=$3);`
-		}
+
+		updateQuery = QueryToUpdateBalances
 	} else {
 
 		if bal.FromUserID == from_user_id && bal.ToUserID == to_user_id {
 
 			amount += bal.Amount
-			updateQuery = `UPDATE BALANCES SET amount=$4 WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1)) AND group_id=$3;`
+			updateQuery = QueryToUpdateBalances
 			//if fromuserid is different -> sub
 		} else if bal.FromUserID == to_user_id && bal.ToUserID == from_user_id {
 
@@ -122,13 +114,9 @@ func insertDebt(db *sql.DB, bal Balances, isCalculated bool) error {
 			if amount < 0 {
 
 				amount = -amount
-				updateQuery = `
-		UPDATE BALANCES
-		SET amount=$4, from_user_id=$2, to_user_id=$1
-		WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1) AND group_id=$3);
-	`
+				updateQuery = QueryToUpdateBalancesData
 			} else {
-				updateQuery = `UPDATE BALANCES SET amount=$4 WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1) AND group_id=$3);`
+				updateQuery = QueryToUpdateBalances
 			}
 		}
 	}
@@ -149,23 +137,11 @@ func (ex *Expense) Save() error {
 
 	isMember, err := userInGroup(db.DB, ex.AddedBy, ex.Groupid)
 
-	if err != nil {
-		return err
+	if !isMember || err != nil {
+		return fmt.Errorf("user %d is not member of %d or system is unable to check your membership.", ex.AddedBy, ex.Groupid)
 	}
 
-	if !isMember {
-		return fmt.Errorf("user %d is not member of %d", ex.AddedBy, ex.Groupid)
-	}
-
-	query := `
-		INSERT INTO expense (
-			description, amount, currency, category, added_at,
-			is_recurring, recurring_period, notes, group_id, added_by
-		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
-		) RETURNING id`
-
-	stmt, err := db.DB.Prepare(query)
+	stmt, err := db.DB.Prepare(QueryToPostExpense)
 	if err != nil {
 		return fmt.Errorf("error preparing query: %w", err)
 	}
@@ -174,9 +150,8 @@ func (ex *Expense) Save() error {
 	debts, adjustment := CalculateBalance(ex)
 
 	var simplifyDebt bool
-	queryToGetGroupType := `Select simplify_debt from groups where id=$1 `
 
-	err = db.DB.QueryRow(queryToGetGroupType, ex.Groupid).Scan(&simplifyDebt)
+	err = db.DB.QueryRow(QueryToGetGroupType, ex.Groupid).Scan(&simplifyDebt)
 
 	if err != nil {
 		return fmt.Errorf("error getting group type: %w", err)
