@@ -1,6 +1,7 @@
 package models
 
 import (
+	"database/sql"
 	"fmt"
 
 	"hirensavani.com/db"
@@ -48,4 +49,16 @@ func (g *Groups) AddMember(userId int64) error {
 	}
 
 	return nil
+}
+
+//Check user is part of group or not
+func userInGroup(db *sql.DB, userId int64, groupId int64) (bool, error) {
+	var exists bool
+	err := db.QueryRow(QueryToCheckIsMemberOfGroup, userId, groupId).Scan(&exists)
+
+	if err != nil {
+		return false, err
+	}
+
+	return exists, nil
 }
