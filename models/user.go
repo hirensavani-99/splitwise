@@ -20,14 +20,9 @@ type User struct {
 
 // Save method to save user to the database
 func (u *User) Save() (int64, error) {
-	// PostgreSQL uses $1, $2 for placeholders
-	query := "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id"
-
-	// Debugging output for SQL query and user data
-	fmt.Printf("Executing query: %s with email: %s and hashed password\n", query, u.Email)
 
 	// Prepare the statement
-	stmt, err := db.DB.Prepare(query)
+	stmt, err := db.DB.Prepare(QueryToSaveUser)
 	if err != nil {
 		return 0, fmt.Errorf("error preparing query: %w", err)
 	}

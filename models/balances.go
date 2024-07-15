@@ -14,13 +14,8 @@ type Balances struct {
 
 func (bal *Balances) Get(db *sql.DB, userID int64) (map[int64]float64, error) {
 	balances := make(map[int64]float64)
-	query := `	
-		SELECT from_user_id, to_user_id, amount
-		FROM Balances
-		WHERE from_user_id = $1 OR to_user_id = $1
-	`
 
-	rows, err := db.Query(query, userID)
+	rows, err := db.Query(QueryToGetBalances, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query balances: %w", err)
 	}
@@ -33,7 +28,7 @@ func (bal *Balances) Get(db *sql.DB, userID int64) (map[int64]float64, error) {
 		}
 
 		if bal.FromUserID != userID {
-			balances[bal.FromUserID] = -bal  .Amount
+			balances[bal.FromUserID] = -bal.Amount
 		} else {
 			balances[bal.ToUserID] = bal.Amount
 		}

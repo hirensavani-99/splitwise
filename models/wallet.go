@@ -17,14 +17,7 @@ type Wallet struct {
 
 func (wallet *Wallet) Save(db *sql.DB) error {
 
-	query := `
-		INSERT INTO wallets (
-			user_id, balance, currency
-		) VALUES (
-			$1, $2, $3
-		)`
-	fmt.Println(wallet)
-	stmt, err := db.Prepare(query)
+	stmt, err := db.Prepare(QueryToSaveWallet)
 	if err != nil {
 		return fmt.Errorf("error preparing query: %w", err)
 	}
@@ -41,13 +34,7 @@ func (wallet *Wallet) Save(db *sql.DB) error {
 
 func (wallet *Wallet) Get(db *sql.DB, userID int64) error {
 
-	query := `
-		SELECT user_id, balance, currency, createdAt, updatedAt
-		FROM wallets
-		WHERE user_id = $1
-	`
-
-	row := db.QueryRow(query, userID)
+	row := db.QueryRow(QueryToGetWalletDataByUserId, userID)
 	err := row.Scan(&wallet.UserID, &wallet.Balance, &wallet.Currency, &wallet.CreatedAt, &wallet.UpdatedAt)
 
 	if err != nil {
@@ -74,8 +61,7 @@ func (wallet *Wallet) Update(db *sql.DB, userid int64, adjustment float64) error
 		return fmt.Errorf("Failed to begin transcations %w", err)
 	}
 
-	querySelect := `SELECT BALANCE FROM Wallets WHERE USER_ID=$1`
-	err = db.QueryRow(querySelect, userid).Scan(&wallet.Balance)
+	err = db.QueryRow(QueryToGetWalletBalanceByUserId, userid).Scan(&wallet.Balance)
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to get current balance: %w", err)
@@ -83,10 +69,9 @@ func (wallet *Wallet) Update(db *sql.DB, userid int64, adjustment float64) error
 
 	wallet.Balance += adjustment
 	wallet.UpdatedAt = time.Now()
-	//Update wallete
-	updatedWallet := `UPDATE Wallets SET BALANCE=$2 , updatedAt=$3 WHERE USER_ID=$1`
-
-	_, err = db.Exec(updatedWallet, userid, wallet.Balance, wallet.UpdatedAt)
+	
+	//Update wallet
+	_, err = db.Exec(QueryToUpdateWalletBalance, userid, wallet.Balance, wallet.UpdatedAt)
 
 	if err != nil {
 		tx.Rollback()

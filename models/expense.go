@@ -32,8 +32,7 @@ type Expense struct {
 
 func userInGroup(db *sql.DB, userId int64, groupId int64) (bool, error) {
 	var exists bool
-	query := `SELECT EXISTS (SELECT 1 FROM group_member WHERE user_id = $1 AND group_id = $2)`
-	err := db.QueryRow(query, userId, groupId).Scan(&exists)
+	err := db.QueryRow(QueryToCheckIsMemberOfGroup, userId, groupId).Scan(&exists)
 
 	if err != nil {
 		return false, err
@@ -216,7 +215,7 @@ func getBalanacesForGroup(groupid int64) ([]Balances, error) {
 	balance := Balances{}
 	balances := []Balances{}
 
-	query := `Select from_user_id , to_user_id , group_id , amount from balances where group_id=$1`
+	query := QueryToGetBalanceByGrouId
 
 	rows, err := db.DB.Query(query, groupid)
 	if err != nil {
@@ -315,10 +314,7 @@ func minimizeTransactions(debtors []int64, creditors []int64, netBalances map[in
 
 func deleteOtherRecords(keepRecords []Balances, groupId int64) error {
 	// Construct the SQL query
-	query := `
-        DELETE  FROM balances
-        WHERE group_id = $1
-        AND (from_user_id, to_user_id, group_id, amount) NOT IN `
+	query := QueryToDeleteUnnecessaryBalances
 
 	var records []string
 	for _, record := range keepRecords {
@@ -329,7 +325,7 @@ func deleteOtherRecords(keepRecords []Balances, groupId int64) error {
 	query = query + "(" + strings.Join(records, ",") + ")"
 	// Execute the DELETE statement
 
-	_, err := db.DB.Exec(query, groupId)
+	_, err := db.DB.Exec(QueryToDeleteUnnecessaryBalances, groupId)
 	if err != nil {
 		return fmt.Errorf("failed to delete records: %w", err)
 	}
