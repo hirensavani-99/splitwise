@@ -51,14 +51,22 @@ func (g *Groups) AddMember(userId int64) error {
 	return nil
 }
 
-//Check user is part of group or not
-func userInGroup(db *sql.DB, userId int64, groupId int64) (bool, error) {
-	var exists bool
-	err := db.QueryRow(QueryToCheckIsMemberOfGroup, userId, groupId).Scan(&exists)
+func GetGroupIdsByUserId(db *sql.DB, userId int64) ([]int64, error) {
+	var groupids []int64
+
+	rows, err := db.Query(QueryToGetGroupsIdByUserId, userId)
 
 	if err != nil {
-		return false, err
+		return nil, WrapError(err, ErrExecutingQuery)
 	}
 
-	return exists, nil
+	for rows.Next() {
+		var groupId int64
+		if err := rows.Scan(&groupId); err != nil {
+			return nil, WrapError(err, ErrScaningRow)
+		}
+		groupids = append(groupids, groupId)
+	}
+
+	return groupids, nil
 }

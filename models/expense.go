@@ -1,6 +1,7 @@
 package models
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"sync"
@@ -95,6 +96,7 @@ func (ex *Expense) Save() error {
 	for _, debt := range debts {
 		go func(debt Balances) {
 			defer wg.Done()
+
 			wallet := &Wallet{}
 			err = wallet.Update(db.DB, debt.ToUserID, -debt.Amount)
 			if err != nil {
@@ -105,11 +107,13 @@ func (ex *Expense) Save() error {
 	}
 	go func() {
 		defer wg.Done()
+
 		wallet := &Wallet{}
 		err := wallet.Update(db.DB, ex.AddedBy, adjustment)
 		if err != nil {
 			log.Printf("Error updating wallet for creditor %d: %v", ex.AddedBy, err)
 		}
+
 	}()
 
 	// Wait for all wallet updates to finish
@@ -121,5 +125,51 @@ func (ex *Expense) Save() error {
 	}
 
 	return nil
+}
+
+func (ex *Expense) GetExpenseByGroupId(db *sql.DB, groupId int64) ([]Expense, error) {
+
+	var expenses []Expense
+
+	rows, err := db.Query(QueryToGetExpense, groupId)
+
+	if err != nil {
+		return nil, WrapError(err, ErrExecutingQuery)
+	}
+
+	for rows.Next() {
+		// ex := Expense{}
+		err := rows.Scan(&ex.ID, &ex.Description, &ex.Amount, &ex.Currency, &ex.Category, &ex.AddedAt, &ex.IsRecurring, &ex.RecurringPeriod, &ex.Notes, &ex.Groupid, &ex.AddedBy)
+
+		if err != nil {
+			return nil, WrapError(err, ErrScaningRow)
+		}
+		expenses = append(expenses, *ex)
+	}
+
+	return expenses, nil
+}
+
+func GetAllExpense(db *sql.DB, userId int64) ([]Expense, error) {
+
+	var expenses []Expense
+	// Find groups where groupmember = userId
+	groupIds, err := GetGroupIdsByUserId(db, userId)
+
+	if err != nil {
+		return nil, WrapError(err, ErrGettingGroupId)
+	}
+
+	// Find all expense atteched to groups
+
+	for _, groupId := range groupIds {
+		var expense Expense
+		expensesAttchedToGroupId, err := expense.GetExpenseByGroupId(db, groupId)
+		if err != nil {
+			return nil, WrapError(err, ErrGettingExpenses)
+		}
+		expenses = append(expenses, expensesAttchedToGroupId...)
+	}
+	return expenses, nil
 
 }

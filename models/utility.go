@@ -1,6 +1,7 @@
 package models
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"math"
@@ -10,6 +11,18 @@ import (
 
 	"hirensavani.com/db"
 )
+
+// Check user is part of group or not
+func userInGroup(db *sql.DB, userId int64, groupId int64) (bool, error) {
+	var exists bool
+	err := db.QueryRow(QueryToCheckIsMemberOfGroup, userId, groupId).Scan(&exists)
+
+	if err != nil {
+		return false, err
+	}
+
+	return exists, nil
+}
 
 // Calculate Balance to add fo each user
 func CalculateBalance(expense *Expense) ([]Balances, float64) {

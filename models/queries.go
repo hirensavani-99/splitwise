@@ -2,7 +2,7 @@ package models
 
 const (
 	//User Query
-	QueryToSaveUser = "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id"
+	QueryToSaveUser = "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id;"
 
 	//Expense Query
 	QueryToPostExpense = `
@@ -13,28 +13,33 @@ const (
 		$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 	) RETURNING id;`
 
+	QueryToGetExpense = `
+	Select * from expense where group_id=$1
+	`
 	//Group query
 	QueryToGetGroupType = `Select simplify_debt from groups where id=$1;`
 
-	QueryToCheckIsMemberOfGroup = `SELECT EXISTS (SELECT 1 FROM group_member WHERE user_id = $1 AND group_id = $2)`
+	QueryToCheckIsMemberOfGroup = `SELECT EXISTS (SELECT 1 FROM group_member WHERE user_id = $1 AND group_id = $2);`
 
-	QueryToSaveGroup = "INSERT INTO groups (name,description,simplify_debt) VALUES ($1, $2,$3) RETURNING id"
+	QueryToSaveGroup = "INSERT INTO groups (name,description,simplify_debt) VALUES ($1, $2,$3) RETURNING id;"
 
-	QueryToAddGroupMember = "INSERT INTO group_member (group_id,user_id) VALUES ($1, $2)"
+	QueryToAddGroupMember = "INSERT INTO group_member (group_id,user_id) VALUES ($1, $2);"
+
+	QueryToGetGroupsIdByUserId = `SELECT group_id FROM group_member WHERE user_id=$1;`
 
 	//Balance query
 	QueryToGetBalances = `	
 	SELECT from_user_id, to_user_id, amount
 	FROM Balances
-	WHERE from_user_id = $1 OR to_user_id = $1
+	WHERE from_user_id = $1 OR to_user_id = $1;
 `
 	QueryToGetExistingBalances = `SELECT from_user_id, to_user_id, amount , group_id FROM BALANCES WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1)) AND group_id=$3;`
 
-	QueryToGetBalanceByGrouId = `Select from_user_id , to_user_id , group_id , amount from balances where group_id=$1`
+	QueryToGetBalanceByGrouId = `Select from_user_id , to_user_id , group_id , amount from balances where group_id=$1;`
 
 	QueryToPostBalances = `
 	INSERT INTO BALANCES (from_user_id, to_user_id ,group_id, amount, created_at)
-	VALUES ($1, $2, $3, $4,$5)
+	VALUES ($1, $2, $3, $4,$5);
 `
 
 	QueryToUpdateBalances = `UPDATE BALANCES SET amount=$4 WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1)) AND group_id=$3;`
@@ -56,14 +61,14 @@ const (
 		user_id, balance, currency
 	) VALUES (
 		$1, $2, $3
-	)`
+	);`
 
 	QueryToGetWalletDataByUserId = `
 	SELECT user_id, balance, currency, createdAt, updatedAt
 	FROM wallets
-	WHERE user_id = $1
+	WHERE user_id = $1;
 `
-	QueryToGetWalletBalanceByUserId = `SELECT BALANCE FROM Wallets WHERE USER_ID=$1`
+	QueryToGetWalletBalanceByUserId = `SELECT BALANCE FROM Wallets WHERE USER_ID=$1;`
 
-	QueryToUpdateWalletBalance = `UPDATE Wallets SET BALANCE=$2 , updatedAt=$3 WHERE USER_ID=$1`
+	QueryToUpdateWalletBalance = `UPDATE Wallets SET BALANCE=$2 , updatedAt=$3 WHERE USER_ID=$1;`
 )

@@ -3,14 +3,12 @@ package routes
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"hirensavani.com/db"
 	"hirensavani.com/models"
 )
-
-// func getExpense(context, *gin.Context) {
-
-// }
 
 func createExpense(context *gin.Context) {
 	var expense models.Expense
@@ -30,4 +28,21 @@ func createExpense(context *gin.Context) {
 	}
 
 	context.JSON(http.StatusOK, gin.H{"message": "Expense added succesfully."})
+}
+
+func getAllExpenses(context *gin.Context) {
+	userId, err := strconv.ParseInt(context.Param("userId"), 10, 64)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Invalid userId"})
+		return
+	}
+
+	expenses, err := models.GetAllExpense(db.DB, userId)
+	if err != nil {
+		fmt.Println(err)
+		context.JSON(http.StatusBadRequest, gin.H{"message": "issue returning Expenses", "err": err})
+		return
+	}
+
+	context.JSON(http.StatusOK, gin.H{"Expenses": expenses})
 }

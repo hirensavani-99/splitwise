@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS group_member (
     user_id INT REFERENCES users(id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_group_member_userid ON group_member(user_id);
 
 CREATE TABLE IF NOT EXISTS expense(
     id SERIAL PRIMARY KEY,
@@ -33,6 +34,7 @@ CREATE TABLE IF NOT EXISTS expense(
     group_id INT REFERENCES groups(id),
     added_by INT REFERENCES users(id)
 );
+CREATE INDEX IF NOT EXISTS idx_expense_group_id ON expense(group_id);
 
 CREATE TABLE IF NOT EXISTS Wallets (
     user_id INT PRIMARY KEY,

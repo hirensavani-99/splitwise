@@ -8,4 +8,5 @@ func RegisterRoutes(server *gin.Engine) {
 	server.POST("/groups/:group_Id/member", AddMemberToGroup)
 	server.POST("/groups/expense", createExpense)
 	server.GET("/getWallet/:userId", getWalletById)
+	server.GET("/getExpenses/:userId", getAllExpenses)
 }
