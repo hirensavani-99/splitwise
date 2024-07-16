@@ -142,10 +142,10 @@ func DeleteUnnecessaryBalances(keepRecords []Balances, groupId int64) error {
 		records = append(records, tuple)
 	}
 
-	query = query + "(" + strings.Join(records, ",") + ")"
+	query = query + "(" + strings.Join(records, ",") + ");"
 	// Execute the DELETE statement
 
-	_, err := db.DB.Exec(QueryToDeleteUnnecessaryBalances, groupId)
+	_, err := db.DB.Exec(query, groupId)
 	if err != nil {
 		return fmt.Errorf("failed to delete records: %w", err)
 	}

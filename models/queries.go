@@ -51,7 +51,7 @@ const (
 `
 
 	QueryToDeleteUnnecessaryBalances = `
-	DELETE  FROM balances
+	DELETE FROM balances
 	WHERE group_id = $1
 	AND (from_user_id, to_user_id, group_id, amount) NOT IN `
 

@@ -3,6 +3,7 @@ package routes
 import (
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -43,6 +44,10 @@ func getAllExpenses(context *gin.Context) {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "issue returning Expenses", "err": err})
 		return
 	}
+
+	sort.SliceStable(expenses, func(i, j int) bool {
+		return !expenses[i].AddedAt.Before(expenses[j].AddedAt)
+	})
 
 	context.JSON(http.StatusOK, gin.H{"Expenses": expenses})
 }
