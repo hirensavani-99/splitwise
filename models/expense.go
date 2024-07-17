@@ -10,6 +10,10 @@ import (
 	"hirensavani.com/db"
 )
 
+type TimeSortable interface {
+	GetAddedAt() time.Time
+}
+
 type Expense struct {
 	ID              int64
 	Groupid         int64
@@ -28,6 +32,9 @@ type Expense struct {
 	Comment         []Comment
 }
 
+func (ex Expense) GetAddedAt() time.Time {
+	return ex.AddedAt
+}
 
 func (ex *Expense) Save() error {
 
@@ -129,11 +136,11 @@ func (ex *Expense) Save() error {
 	return nil
 }
 
-func (ex *Expense) GetExpenseByGroupId(db *sql.DB, groupId int64) ([]Expense, error) {
+func (ex *Expense) GetExpenseByGroupId(db *sql.DB) ([]Expense, error) {
 
 	var expenses []Expense
 
-	rows, err := db.Query(QueryToGetExpense, groupId)
+	rows, err := db.Query(QueryToGetExpense, ex.Groupid)
 
 	if err != nil {
 		return nil, WrapError(err, ErrExecutingQuery)
@@ -146,6 +153,18 @@ func (ex *Expense) GetExpenseByGroupId(db *sql.DB, groupId int64) ([]Expense, er
 		if err != nil {
 			return nil, WrapError(err, ErrScaningRow)
 		}
+
+		var comment Comment
+		comment.ExpenseID = ex.ID
+		comments, err := comment.Get(db)
+
+		if err != nil {
+			return nil, WrapError(err, ErrGettingComments)
+		}
+
+		ex.Comment = comments
+		//connect comments
+
 		expenses = append(expenses, *ex)
 	}
 
@@ -166,12 +185,15 @@ func GetAllExpense(db *sql.DB, userId int64) ([]Expense, error) {
 
 	for _, groupId := range groupIds {
 		var expense Expense
-		expensesAttchedToGroupId, err := expense.GetExpenseByGroupId(db, groupId)
+		expense.Groupid = groupId
+		expensesAttchedToGroupId, err := expense.GetExpenseByGroupId(db)
 		if err != nil {
 			return nil, WrapError(err, ErrGettingExpenses)
 		}
 		expenses = append(expenses, expensesAttchedToGroupId...)
 	}
+
+	SortByTime(expenses)
 	return expenses, nil
 
 }

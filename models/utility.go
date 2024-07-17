@@ -163,3 +163,9 @@ func DeleteUnnecessaryBalances(keepRecords []Balances, groupId int64) error {
 
 	return nil
 }
+
+func SortByTime[T TimeSortable](listOfItem []T) {
+	sort.SliceStable(listOfItem, func(i, j int) bool {
+		return !listOfItem[i].GetAddedAt().Before(listOfItem[j].GetAddedAt())
+	})
+}
