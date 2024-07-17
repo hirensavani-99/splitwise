@@ -57,3 +57,13 @@ CREATE TABLE IF NOT EXISTS Balances(
             FOREIGN KEY (group_id) REFERENCES groups(id)
 
 );
+
+CREATE TABLE IF NOT EXISTS comments(
+    id SERIAL PRIMARY KEY,
+    expense_id int NOT NULL,
+    user_id int NOT NULL,
+    content text NOT null,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (expense_id) REFERENCES expense(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);

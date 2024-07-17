@@ -25,7 +25,9 @@ type Expense struct {
 	Tags            []string
 	AddTo           map[string]string
 	SplitType       string
+	Comment         []Comment
 }
+
 
 func (ex *Expense) Save() error {
 
