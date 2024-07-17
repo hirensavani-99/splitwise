@@ -12,6 +12,17 @@ import (
 	"hirensavani.com/db"
 )
 
+// Check expense with expense id exists or not
+func IsExpense(db *sql.DB, expenseId int64) bool {
+	var exists bool
+	err := db.QueryRow(QueryToCheckIsExpenseExists, expenseId).Scan(&exists)
+
+	if err != nil {
+		return false
+	}
+	return exists
+}
+
 // Check user is part of group or not
 func userInGroup(db *sql.DB, userId int64, groupId int64) (bool, error) {
 	var exists bool

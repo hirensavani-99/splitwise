@@ -16,6 +16,8 @@ const (
 	QueryToGetExpense = `
 	Select * from expense where group_id=$1
 	`
+	QueryToCheckIsExpenseExists = `SELECT EXISTS (SELECT 1 FROM expense WHERE id=$1);`
+
 	//Group query
 	QueryToGetGroupType = `Select simplify_debt from groups where id=$1;`
 
@@ -71,4 +73,14 @@ const (
 	QueryToGetWalletBalanceByUserId = `SELECT BALANCE FROM Wallets WHERE USER_ID=$1;`
 
 	QueryToUpdateWalletBalance = `UPDATE Wallets SET BALANCE=$2 , updatedAt=$3 WHERE USER_ID=$1;`
+
+	//comments
+
+	QueryToSaveComments = `INSERT INTO comments (
+			expense_id,
+			user_id,
+			content
+		) VALUES (
+			$1,$2,$3
+		) `
 )
