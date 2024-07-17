@@ -7,7 +7,8 @@ const (
 	ErrScaningRow      = `An Error ocurred while Scanning row : %w`
 	ErrGettingGroupId  = `An Error ocurred while getting groupids by userids : %w`
 	ErrGettingExpenses = `An Error ocurred while getting Expenses : %w`
-	ErrExpNotExists    = `An Error occured while checking Expense exists or not`
+	ErrExpNotExists    = `An Error occurred while checking Expense exists or not`
+	ErrGettingComments = `An Error ocurred while getting comments for expense %w`
 )
 
 func WrapError(err error, msg string) error {

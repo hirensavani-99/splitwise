@@ -82,5 +82,7 @@ const (
 			content
 		) VALUES (
 			$1,$2,$3
-		) `
+		);`
+
+	QueryToGetCommentsByExpenseId = `Select * from comments where expense_id=$1`
 )
