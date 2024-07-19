@@ -181,6 +181,9 @@ func GetAllExpense(db *sql.DB, userId int64) ([]Expense, error) {
 		return nil, WrapError(err, ErrGettingGroupId)
 	}
 
+	if len(groupIds) == 0 {
+		return expenses, nil
+	}
 	// Find all expense atteched to groups
 
 	for _, groupId := range groupIds {
