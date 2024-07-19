@@ -56,10 +56,3 @@ func (comment *Comment) Save(db *sql.DB) error {
 	return nil
 }
 
-func (comment *Comment) update() {
-
-}
-
-func (comment *Comment) Delete() {
-
-}
