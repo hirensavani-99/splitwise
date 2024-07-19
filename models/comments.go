@@ -55,4 +55,3 @@ func (comment *Comment) Save(db *sql.DB) error {
 
 	return nil
 }
-
