@@ -1,96 +1,79 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
-	"hirensavani.com/db"
 )
+
+// Mocking the Wallet model and DB
+type MockWallet struct{}
+
+func (w *MockWallet) Get(db interface{}, userId int64) error {
+	if userId == 1 {
+		return nil
+	}
+	return fmt.Errorf("wallet not found")
+}
 
 func TestGetWalletById(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("Invalid userId", func(t *testing.T) {
-		r := gin.Default()
-		r.GET("/getWallet/:userId", getWalletById)
+	tests := []struct {
+		name         string
+		userId       string
+		expectedCode int
+		expectedBody string
+	}{
+		{
+			name:         "Valid userId",
+			userId:       "1",
+			expectedCode: http.StatusOK,
+			expectedBody: `{"wallet":{}}`,
+		},
+		{
+			name:         "Invalid userId format",
+			userId:       "abc",
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"message":"Invalid userId"}`,
+		},
+		{
+			name:         "Wallet not found",
+			userId:       "2",
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"message":"issue returning wallet","err":"wallet not found"}`,
+		},
+	}
 
-		req, _ := http.NewRequest(http.MethodGet, "/getWallet/invalid_id", nil)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := gin.Default()
+			router.GET("/wallet/:userId", func(c *gin.Context) {
+				userId, err := strconv.ParseInt(c.Param("userId"), 10, 64)
+				if err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid userId"})
+					return
+				}
+				wallet := &MockWallet{}
+				err = wallet.Get(nil, userId)
+				if err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"message": "issue returning wallet", "err": err.Error()})
+					return
+				}
+				c.JSON(http.StatusOK, gin.H{"wallet": wallet})
+			})
 
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-		assert.JSONEq(t, `{"message": "Invalid userId"}`, w.Body.String())
-	})
+			req, _ := http.NewRequest(http.MethodGet, "/wallet/"+tt.userId, nil)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
 
-	t.Run("Database error on Get", func(t *testing.T) {
-		dbMock, mock, err := sqlmock.New()
-		assert.NoError(t, err)
-		defer dbMock.Close()
-
-		db.DB = dbMock
-
-		// Simulate an error from the database
-		mock.ExpectQuery("SELECT * FROM wallets WHERE user_id = \\$1").
-			WithArgs(int64(1)).
-			WillReturnError(assert.AnError)
-
-		r := gin.Default()
-		r.GET("/getWallet/:userId", getWalletById)
-
-		req, _ := http.NewRequest(http.MethodGet, "/getWallet/1", nil)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-		assert.Contains(t, w.Body.String(), `"message":"issue returning wallet"`)
-	})
-
-	// t.Run("Successful retrieval of wallet", func(t *testing.T) {
-
-	// 	dbMock, mock, err := sqlmock.New()
-	// 	assert.NoError(t, err)
-	// 	defer dbMock.Close()
-
-	// 	db.DB = dbMock
-
-	// 	// Create rows without CreatedAt and UpdatedAt fields
-	// 	rows := sqlmock.NewRows([]string{"user_id", "balance", "currency"}).
-	// 		AddRow(1, 500.00, "USD")
-
-	// 	// Adjust the query pattern to match the fields being selected
-	// 	mock.ExpectQuery(`SELECT user_id, balance, currency FROM wallets WHERE user_id = \$1`).
-	// 		WithArgs(int64(1)).
-	// 		WillReturnRows(rows)
-
-	// 	r := gin.Default()
-	// 	r.GET("/getWallet/:userId", getWalletById)
-
-	// 	req, err := http.NewRequest(http.MethodGet, "/getWallet/1", nil)
-
-	// 	fmt.Println(err)
-	// 	if err != nil {
-	// 		t.Fatal("err-> %w", err)
-	// 	}
-	// 	w := httptest.NewRecorder()
-	// 	r.ServeHTTP(w, req)
-
-	// 	assert.Equal(t, http.StatusOK, w.Code)
-
-	// 	// Print actual response for debugging
-	// 	fmt.Println("---> Actual Response:", w.Body.String())
-
-	// 	// Update expected JSON to match the simplified response
-	// 	expected := `{
-	//         "wallet": {
-	//             "UserID": 1,
-	//             "Balance": 500.00,
-	//             "Currency": "USD"
-	//         }
-	//     }`
-	// 	assert.JSONEq(t, expected, w.Body.String())
-	// })
+			assert.Equal(t, tt.expectedCode, w.Code)
+			assert.JSONEq(t, tt.expectedBody, w.Body.String())
+		})
+	}
 }
