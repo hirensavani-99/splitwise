@@ -19,7 +19,7 @@ func getWalletById(context *gin.Context) {
 	err = wallet.Get(db.DB, userId)
 
 	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{"message":"issue returning wallet", "err": err})
+		context.JSON(http.StatusBadRequest, gin.H{"message": "issue returning wallet", "err": err})
 		return
 	}
 
