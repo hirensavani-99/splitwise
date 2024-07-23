@@ -16,6 +16,9 @@ const (
 	QueryToGetExpense = `
 	Select * from expense where group_id=$1
 	`
+	QueryToGetExpenseByExpenseId = `
+	Select * from expense where id=$1
+	`
 	QueryToCheckIsExpenseExists = `SELECT EXISTS (SELECT 1 FROM expense WHERE id=$1);`
 
 	//Group query
