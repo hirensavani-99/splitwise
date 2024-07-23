@@ -198,5 +198,17 @@ func GetAllExpense(db *sql.DB, userId int64) ([]Expense, error) {
 
 	SortByTime(expenses)
 	return expenses, nil
+}
 
+func (ex *Expense) updateExpense(db *sql.DB, ExpenseId int64) error {
+
+	var expenseToBeUpdated Expense
+	//Get Expense
+	err := db.QueryRow(QueryToGetExpenseByExpenseId, ExpenseId).Scan(&expenseToBeUpdated.ID, &expenseToBeUpdated.Description, &expenseToBeUpdated.Amount, &expenseToBeUpdated.Currency, &expenseToBeUpdated.Category, &expenseToBeUpdated.AddedAt, &expenseToBeUpdated.IsRecurring, &expenseToBeUpdated.RecurringPeriod, &expenseToBeUpdated.Notes, &expenseToBeUpdated.Groupid, &expenseToBeUpdated.AddedBy)
+
+	if err != nil {
+		return WrapError(err, ErrGettingExpenses)
+	}
+	//Update data from wallet , Balances and expense it self
+	return nil
 }
