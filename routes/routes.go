@@ -10,4 +10,5 @@ func RegisterRoutes(server *gin.Engine) {
 	server.POST("/groups/expense", createExpense)
 	server.GET("/getWallet/:userId", getWalletById)
 	server.GET("/getExpenses/:userId", getAllExpenses)
+	server.PATCH("/Expense/:expenseId", updateExpense)
 }

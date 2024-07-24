@@ -153,6 +153,10 @@ func DeleteUnnecessaryBalances(keepRecords []Balances, groupId int64) error {
 		records = append(records, tuple)
 	}
 
+	// If there is no balances which needs to be deleted 
+	if len(records) == 0 {
+		return nil
+	}
 	query = query + "(" + strings.Join(records, ",") + ");"
 	// Execute the DELETE statement
 

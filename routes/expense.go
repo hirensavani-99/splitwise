@@ -16,18 +16,19 @@ func createExpense(context *gin.Context) {
 	err := context.ShouldBindJSON(&expense)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data."})
+		return
 	}
 
-	err = expense.Save()
+	fmt.Println(expense)
 
-	fmt.Println(err)
+	err = expense.Save()
 
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"message": "Error saving Expense.", "err": err})
 		return
 	}
 
-	context.JSON(http.StatusOK, gin.H{"message": "Expense added succesfully."})
+	context.JSON(http.StatusOK, gin.H{"message": "Expense added succesfully.", "data": expense})
 }
 
 func getAllExpenses(context *gin.Context) {
@@ -45,4 +46,32 @@ func getAllExpenses(context *gin.Context) {
 	}
 
 	context.JSON(http.StatusOK, gin.H{"Expenses": expenses})
+}
+
+func updateExpense(context *gin.Context) {
+	ExpenseId, err := strconv.ParseInt(context.Param("expenseId"), 10, 64)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Invalid ExpenseId"})
+		return
+	}
+
+	var expense map[string]interface{}
+
+	err = context.ShouldBindJSON(&expense)
+
+	fmt.Println("--->", expense)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data."})
+	}
+
+	err = models.UpdateExpense(db.DB, expense, ExpenseId)
+
+	if err != nil {
+		fmt.Println(err)
+		context.JSON(http.StatusBadRequest, gin.H{"message": "issue updating Expenses", "err": err})
+		return
+	}
+
+	context.JSON(http.StatusOK, gin.H{"Expenses": expense})
+
 }

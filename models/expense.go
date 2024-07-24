@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,21 +16,21 @@ type TimeSortable interface {
 }
 
 type Expense struct {
-	ID              int64
-	Groupid         int64
-	AddedBy         int64
-	Description     string
-	AddedAt         time.Time
-	Amount          float64
-	Currency        string
-	Category        string
-	IsRecurring     bool
-	RecurringPeriod string
-	Notes           string
-	Tags            []string
-	AddTo           map[string]string
-	SplitType       string
-	Comment         []Comment
+	ID              int64             `json:"id"`
+	Groupid         int64             `json:"group_id"`
+	AddedBy         int64             `json:"added_by"`
+	Description     string            `json:"description"`
+	AddedAt         time.Time         `json:"added_at"`
+	Amount          float64           `json:"amount"`
+	Currency        string            `json:"currency"`
+	Category        string            `json:"category"`
+	IsRecurring     bool              `json:"is_recurring"`
+	RecurringPeriod string            `json:"recurring_period"`
+	Notes           string            `json:"notes"`
+	Tags            []string          `json:"tags"`
+	AddTo           map[string]string `json:"add_to"`
+	SplitType       string            `json:"split_type"`
+	Comment         []Comment         `json:"comments"`
 }
 
 func (ex Expense) GetAddedAt() time.Time {
@@ -40,6 +41,8 @@ func (ex *Expense) Save() error {
 
 	// Validate user membership in group
 	isMember, err := userInGroup(db.DB, ex.AddedBy, ex.Groupid)
+
+	fmt.Println(ex, err)
 
 	if !isMember || err != nil {
 		return fmt.Errorf("user %d is not member of %d or system is unable to check your membership.", ex.AddedBy, ex.Groupid)
@@ -200,20 +203,51 @@ func GetAllExpense(db *sql.DB, userId int64) ([]Expense, error) {
 	return expenses, nil
 }
 
-func (ex *Expense) updateExpense(db *sql.DB) error {
+func UpdateExpense(db *sql.DB, ex map[string]interface{}, expenseId int64) error {
 
 	var expenseToBeUpdated Expense
+
 	//Get Expense
-	err := db.QueryRow(QueryToGetExpenseByExpenseId, ex.ID).Scan(&expenseToBeUpdated.ID, &expenseToBeUpdated.Description, &expenseToBeUpdated.Amount, &expenseToBeUpdated.Currency, &expenseToBeUpdated.Category, &expenseToBeUpdated.AddedAt, &expenseToBeUpdated.IsRecurring, &expenseToBeUpdated.RecurringPeriod, &expenseToBeUpdated.Notes, &expenseToBeUpdated.Groupid, &expenseToBeUpdated.AddedBy)
+	err := db.QueryRow(QueryToGetExpenseByExpenseId, expenseId).Scan(&expenseToBeUpdated.ID, &expenseToBeUpdated.Description, &expenseToBeUpdated.Amount, &expenseToBeUpdated.Currency, &expenseToBeUpdated.Category, &expenseToBeUpdated.AddedAt, &expenseToBeUpdated.IsRecurring, &expenseToBeUpdated.RecurringPeriod, &expenseToBeUpdated.Notes, &expenseToBeUpdated.Groupid, &expenseToBeUpdated.AddedBy)
 
 	if err != nil {
 		return WrapError(err, ErrGettingExpenses)
 	}
-	
-	
-	
+
+	fmt.Println(ex)
+
+	query, err := buildUpdateQuery(ex, expenseId)
+	if err != nil {
+
+		return WrapError(err, "Error building update query:")
+	}
+
+	fmt.Println("Query:", query)
+
 	//Update Expense
-	_, err = db.Exec()
+	_, err = db.Exec(query)
+
+	fmt.Println(query)
 	//Update data from wallet , Balances and expense it self
+	if err != nil {
+		return WrapError(err, ErrExecutingQuery)
+	}
 	return nil
+}
+
+func buildUpdateQuery(expense map[string]interface{}, expenseId int64) (string, error) {
+	query := "UPDATE expense SET "
+	var setClauses []string
+
+	for key, value := range expense {
+		if key == "ID" || key == "Comment" || key == "Tags" || key == "AddTo" || key == "SplitType" || key == "Groupid" || key == "AddedBy" {
+			continue
+		}
+		setClauses = append(setClauses, fmt.Sprintf("%s = '%v'", key, value))
+	}
+
+	query += strings.Join(setClauses, ", ")
+	query += fmt.Sprintf(" WHERE id = %d", expenseId)
+
+	return query, nil
 }
