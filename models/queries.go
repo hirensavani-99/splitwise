@@ -21,6 +21,10 @@ const (
 	`
 	QueryToCheckIsExpenseExists = `SELECT EXISTS (SELECT 1 FROM expense WHERE id=$1);`
 
+	QueryToUpdateExpense = `UPDATE expenses
+	SET description = $1, amount = $2, currency = $3, category = $4, added_at = $5, is_recurring = $6, recurring_period = $7, notes = $8
+	WHERE id = $9`
+
 	//Group query
 	QueryToGetGroupType = `Select simplify_debt from groups where id=$1;`
 
