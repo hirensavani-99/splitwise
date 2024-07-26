@@ -32,7 +32,9 @@ CREATE TABLE IF NOT EXISTS expense(
     recurring_period VARCHAR(255),
     notes TEXT,
     group_id INT REFERENCES groups(id),
-    added_by INT REFERENCES users(id)
+    added_by INT REFERENCES users(id),
+    add_to json
+
 );
 CREATE INDEX IF NOT EXISTS idx_expense_group_id ON expense(group_id);
 

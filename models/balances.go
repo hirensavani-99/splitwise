@@ -121,6 +121,16 @@ func (bal *Balances) getBalanacesForGroup(db *sql.DB, groupid int64) ([]Balances
 	return balances, nil
 }
 
+// Update Balances data
+func (bal *Balances) UpdateBalances(db *sql.DB, AddToDataToBeUpdatedForExpense, updatedAddToDataForExpense map[string]string) {
+	// -> Group I d can not be changed
+
+	// adjustment := updatedAddToDataForExpense.Amount - AddToDataToBeUpdatedForExpense[Amount]
+
+	// new[amount] - old[amount]
+
+}
+
 func NewBalances(FromUserID int64, ToUserID int64, GroupId int64, Amount float64) Balances {
 	return Balances{
 		FromUserID,
