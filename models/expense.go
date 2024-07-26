@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -31,6 +32,13 @@ type Expense struct {
 	AddTo           map[string]string `json:"add_to"`
 	SplitType       string            `json:"split_type"`
 	Comment         []Comment         `json:"comments"`
+}
+
+type RawAddTo struct {
+	Groupid int64             `json:"group_id"`
+	AddedBy int64             `json:"added_by"`
+	AddTo   map[string]string `json:"add_to"`
+	Amount  float64           `json:"amount"`
 }
 
 func (ex Expense) GetAddedAt() time.Time {
@@ -131,7 +139,13 @@ func (ex *Expense) Save() error {
 	// Wait for all wallet updates to finish
 	wg.Wait()
 
-	_, err = stmt.Exec(ex.Description, ex.Amount, ex.Currency, ex.Category, ex.AddedAt, ex.IsRecurring, ex.RecurringPeriod, ex.Notes, ex.Groupid, ex.AddedBy)
+	// Converting AddTo Data in to Json which will be helpfull for updating expense (this data will be just for tracking split between users)
+	addToJson, err := json.Marshal(ex.AddTo)
+	if err != nil {
+		return fmt.Errorf("error marshalling tags: %v", err)
+	}
+
+	_, err = stmt.Exec(ex.Description, ex.Amount, ex.Currency, ex.Category, ex.AddedAt, ex.IsRecurring, ex.RecurringPeriod, ex.Notes, ex.Groupid, ex.AddedBy, addToJson)
 	if err != nil {
 		return fmt.Errorf("error executing query: %w", err)
 	}
@@ -150,13 +164,17 @@ func (ex *Expense) GetExpenseByGroupId(db *sql.DB) ([]Expense, error) {
 	}
 
 	for rows.Next() {
-		// ex := Expense{}
-		err := rows.Scan(&ex.ID, &ex.Description, &ex.Amount, &ex.Currency, &ex.Category, &ex.AddedAt, &ex.IsRecurring, &ex.RecurringPeriod, &ex.Notes, &ex.Groupid, &ex.AddedBy)
+
+		var addTo []byte
+		err := rows.Scan(&ex.ID, &ex.Description, &ex.Amount, &ex.Currency, &ex.Category, &ex.AddedAt, &ex.IsRecurring, &ex.RecurringPeriod, &ex.Notes, &ex.Groupid, &ex.AddedBy, &addTo)
 
 		if err != nil {
 			return nil, WrapError(err, ErrScaningRow)
 		}
 
+		if err := json.Unmarshal(addTo, &ex.AddTo); err != nil {
+			return nil, WrapError(err, "error unmarshalling add_to: %w")
+		}
 		var comment Comment
 		comment.ExpenseID = ex.ID
 		comments, err := comment.Get(db)
@@ -207,14 +225,17 @@ func UpdateExpense(db *sql.DB, ex map[string]interface{}, expenseId int64) error
 
 	var expenseToBeUpdated Expense
 
+	var addTo []byte
 	//Get Expense
-	err := db.QueryRow(QueryToGetExpenseByExpenseId, expenseId).Scan(&expenseToBeUpdated.ID, &expenseToBeUpdated.Description, &expenseToBeUpdated.Amount, &expenseToBeUpdated.Currency, &expenseToBeUpdated.Category, &expenseToBeUpdated.AddedAt, &expenseToBeUpdated.IsRecurring, &expenseToBeUpdated.RecurringPeriod, &expenseToBeUpdated.Notes, &expenseToBeUpdated.Groupid, &expenseToBeUpdated.AddedBy)
+	err := db.QueryRow(QueryToGetExpenseByExpenseId, expenseId).Scan(&expenseToBeUpdated.ID, &expenseToBeUpdated.Description, &expenseToBeUpdated.Amount, &expenseToBeUpdated.Currency, &expenseToBeUpdated.Category, &expenseToBeUpdated.AddedAt, &expenseToBeUpdated.IsRecurring, &expenseToBeUpdated.RecurringPeriod, &expenseToBeUpdated.Notes, &expenseToBeUpdated.Groupid, &expenseToBeUpdated.AddedBy, &addTo)
 
 	if err != nil {
 		return WrapError(err, ErrGettingExpenses)
 	}
 
-	fmt.Println(ex)
+	if err := json.Unmarshal(addTo, &expenseToBeUpdated.AddTo); err != nil {
+		return WrapError(err, "error unmarshalling add_to: %w")
+	}
 
 	query, err := buildUpdateQuery(ex, expenseId)
 	if err != nil {
@@ -228,10 +249,29 @@ func UpdateExpense(db *sql.DB, ex map[string]interface{}, expenseId int64) error
 	_, err = db.Exec(query)
 
 	fmt.Println(query)
-	//Update data from wallet , Balances and expense it self
 	if err != nil {
 		return WrapError(err, ErrExecutingQuery)
 	}
+
+	oldAddToBalances := RawAddTo{
+		Groupid: expenseToBeUpdated.Groupid,
+		AddedBy: expenseToBeUpdated.AddedBy,
+		AddTo:   expenseToBeUpdated.AddTo,
+		Amount:  expenseToBeUpdated.Amount,
+	}
+	for key, value := range ex {
+		// If These conditions pass then only Balances and wallet data needs to be updated
+		if key == "AddedBy" || key == "AddTo" || key == "Amount" {
+			newAddToBalance := RawAddTo{Groupid: expenseToBeUpdated.Groupid}
+
+			// if key == "AddedBy" {
+			// 	newAddToBalance.AddedBy = value
+			// }
+		}
+	}
+
+	//Update data from wallet , Balances and expense it self
+	// UpdateBalances(db)
 	return nil
 }
 
