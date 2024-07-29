@@ -259,15 +259,23 @@ func UpdateExpense(db *sql.DB, ex map[string]interface{}, expenseId int64) error
 		AddTo:   expenseToBeUpdated.AddTo,
 		Amount:  expenseToBeUpdated.Amount,
 	}
-	for key, value := range ex {
-		// If These conditions pass then only Balances and wallet data needs to be updated
-		if key == "AddedBy" || key == "AddTo" || key == "Amount" {
-			newAddToBalance := RawAddTo{Groupid: expenseToBeUpdated.Groupid}
 
-			// if key == "AddedBy" {
-			// 	newAddToBalance.AddedBy = value
-			// }
+	
+
+	for key, value := range ex {
+
+		if key == "AddedBy" {
+			if intValue, ok := value.(int64); ok {
+				expenseToBeUpdated.Groupid = intValue
+			}
 		}
+
+		if key == "Amount" {
+			if intValue, ok := value.(float64); ok {
+				expenseToBeUpdated.Amount = intValue
+			}
+		}
+
 	}
 
 	//Update data from wallet , Balances and expense it self

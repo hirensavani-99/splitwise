@@ -12,6 +12,7 @@ import (
 	"hirensavani.com/db"
 )
 
+
 // Check expense with expense id exists or not
 func IsExpense(db *sql.DB, expenseId int64) bool {
 	var exists bool

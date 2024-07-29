@@ -3,6 +3,7 @@ package models
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -122,8 +123,23 @@ func (bal *Balances) getBalanacesForGroup(db *sql.DB, groupid int64) ([]Balances
 }
 
 // Update Balances data
-func (bal *Balances) UpdateBalances(db *sql.DB, AddToDataToBeUpdatedForExpense, updatedAddToDataForExpense map[string]string) {
-	// -> Group I d can not be changed
+func (bal *Balances) UpdateBalances(db *sql.DB, AddToDataToBeUpdatedForExpense, updatedAddToDataForExpense map[string]interface{}) {
+
+
+
+
+	for key, value := range updatedAddToDataForExpense {
+		
+		// If These conditions pass then only Balances and wallet data needs to be updated
+
+		// Group Id can not be changed
+		if key == "Groupid" {
+			return
+		}
+
+		// user intend to change ToUserId , FromUserId or Amount
+		//revert old transcations
+	}
 
 	// adjustment := updatedAddToDataForExpense.Amount - AddToDataToBeUpdatedForExpense[Amount]
 
