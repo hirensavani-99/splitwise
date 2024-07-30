@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -145,7 +146,7 @@ func (ex *Expense) Save() error {
 		return fmt.Errorf("error marshalling tags: %v", err)
 	}
 
-	_, err = stmt.Exec(ex.Description, ex.Amount, ex.Currency, ex.Category, ex.AddedAt, ex.IsRecurring, ex.RecurringPeriod, ex.Notes, ex.Groupid, ex.AddedBy, addToJson)
+	_, err = stmt.Exec(ex.Description, ex.Amount, ex.Currency, ex.Category, ex.AddedAt, ex.IsRecurring, ex.RecurringPeriod, ex.Notes, ex.Groupid, ex.AddedBy, addToJson, ex.SplitType)
 	if err != nil {
 		return fmt.Errorf("error executing query: %w", err)
 	}
@@ -166,7 +167,7 @@ func (ex *Expense) GetExpenseByGroupId(db *sql.DB) ([]Expense, error) {
 	for rows.Next() {
 
 		var addTo []byte
-		err := rows.Scan(&ex.ID, &ex.Description, &ex.Amount, &ex.Currency, &ex.Category, &ex.AddedAt, &ex.IsRecurring, &ex.RecurringPeriod, &ex.Notes, &ex.Groupid, &ex.AddedBy, &addTo)
+		err := rows.Scan(&ex.ID, &ex.Description, &ex.Amount, &ex.Currency, &ex.Category, &ex.AddedAt, &ex.IsRecurring, &ex.RecurringPeriod, &ex.Notes, &ex.SplitType, &ex.Groupid, &ex.AddedBy, &addTo)
 
 		if err != nil {
 			return nil, WrapError(err, ErrScaningRow)
@@ -223,12 +224,14 @@ func GetAllExpense(db *sql.DB, userId int64) ([]Expense, error) {
 
 func UpdateExpense(db *sql.DB, ex map[string]interface{}, expenseId int64) error {
 
-	var expenseToBeUpdated Expense
+	expenseToBeUpdated := &Expense{}
 
 	var addTo []byte
+	var spl string
 	//Get Expense
-	err := db.QueryRow(QueryToGetExpenseByExpenseId, expenseId).Scan(&expenseToBeUpdated.ID, &expenseToBeUpdated.Description, &expenseToBeUpdated.Amount, &expenseToBeUpdated.Currency, &expenseToBeUpdated.Category, &expenseToBeUpdated.AddedAt, &expenseToBeUpdated.IsRecurring, &expenseToBeUpdated.RecurringPeriod, &expenseToBeUpdated.Notes, &expenseToBeUpdated.Groupid, &expenseToBeUpdated.AddedBy, &addTo)
+	err := db.QueryRow(QueryToGetExpenseByExpenseId, expenseId).Scan(&expenseToBeUpdated.ID, &expenseToBeUpdated.Description, &expenseToBeUpdated.Amount, &expenseToBeUpdated.Currency, &expenseToBeUpdated.Category, &expenseToBeUpdated.AddedAt, &expenseToBeUpdated.IsRecurring, &expenseToBeUpdated.RecurringPeriod, &expenseToBeUpdated.Notes, &expenseToBeUpdated.SplitType, &expenseToBeUpdated.Groupid, &expenseToBeUpdated.AddedBy, &addTo)
 
+	fmt.Println(spl, reflect.TypeOf(spl))
 	if err != nil {
 		return WrapError(err, ErrGettingExpenses)
 	}
@@ -248,38 +251,70 @@ func UpdateExpense(db *sql.DB, ex map[string]interface{}, expenseId int64) error
 	//Update Expense
 	_, err = db.Exec(query)
 
-	fmt.Println(query)
+	fmt.Println(expenseToBeUpdated)
 	if err != nil {
 		return WrapError(err, ErrExecutingQuery)
 	}
 
-	oldAddToBalances := RawAddTo{
-		Groupid: expenseToBeUpdated.Groupid,
-		AddedBy: expenseToBeUpdated.AddedBy,
-		AddTo:   expenseToBeUpdated.AddTo,
-		Amount:  expenseToBeUpdated.Amount,
-	}
-
-	
-
+	updatedExpenseData := &Expense{}
 	for key, value := range ex {
-
-		if key == "AddedBy" {
-			if intValue, ok := value.(int64); ok {
-				expenseToBeUpdated.Groupid = intValue
+		// Todo : if update data does not contain enough data ...
+		if key == "added_by" {
+			switch v := value.(type) {
+			case int64:
+				// If value is already int64, assign it directly
+				updatedExpenseData.AddedBy = v
+			case float64:
+				// If value is float64, convert it to int64
+				updatedExpenseData.AddedBy = int64(v)
+			default:
+				fmt.Printf("Unexpected type for key %s: %T\n", key, value)
 			}
 		}
 
-		if key == "Amount" {
-			if intValue, ok := value.(float64); ok {
-				expenseToBeUpdated.Amount = intValue
+		if key == "amount" {
+			if amount, ok := value.(float64); ok {
+				updatedExpenseData.Amount = amount
+			}
+		}
+		if key == "group_id" {
+			switch v := value.(type) {
+			case int64:
+				// If value is already int64, assign it directly
+				updatedExpenseData.Groupid = v
+			case float64:
+				// If value is float64, convert it to int64
+				updatedExpenseData.Groupid = int64(v)
+			default:
+				fmt.Printf("Unexpected type for key %s: %T\n", key, value)
+			}
+		}
+
+		if key == "split_type" {
+			if splitType, ok := value.(string); ok {
+				updatedExpenseData.SplitType = splitType
+			}
+		}
+
+		if key == "add_to" {
+
+			if addToInterface, ok := value.(map[string]interface{}); ok {
+				addToStringMap := make(map[string]string)
+				for k, v := range addToInterface {
+					if strValue, ok := v.(string); ok {
+						addToStringMap[k] = strValue
+					}
+				}
+
+				updatedExpenseData.AddTo = addToStringMap
 			}
 		}
 
 	}
 
-	//Update data from wallet , Balances and expense it self
-	// UpdateBalances(db)
+	expenseToBeUpdated.Amount = -expenseToBeUpdated.Amount
+	// Update data from wallet , Balances and expense it self
+	UpdateBalances(db, expenseToBeUpdated, updatedExpenseData)
 	return nil
 }
 
@@ -288,7 +323,8 @@ func buildUpdateQuery(expense map[string]interface{}, expenseId int64) (string, 
 	var setClauses []string
 
 	for key, value := range expense {
-		if key == "ID" || key == "Comment" || key == "Tags" || key == "AddTo" || key == "SplitType" || key == "Groupid" || key == "AddedBy" {
+
+		if key == "id" || key == "comments" || key == "tags" || key == "add_to" || key == "group_id" || key == "added_by" {
 			continue
 		}
 		setClauses = append(setClauses, fmt.Sprintf("%s = '%v'", key, value))

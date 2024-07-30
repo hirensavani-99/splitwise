@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS expense(
     is_recurring BOOLEAN NOT NULL,
     recurring_period VARCHAR(255),
     notes TEXT,
+    split_type TEXT,
     group_id INT REFERENCES groups(id),
     added_by INT REFERENCES users(id),
     add_to json

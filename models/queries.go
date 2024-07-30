@@ -8,9 +8,9 @@ const (
 	QueryToPostExpense = `
 	INSERT INTO expense (
 		description, amount, currency, category, added_at,
-		is_recurring, recurring_period, notes, group_id, added_by,add_to
+		is_recurring, recurring_period, notes, group_id, added_by,add_to,split_type
 	) VALUES (
-		$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,$11
+		$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,$11,$12
 	) RETURNING id;`
 
 	QueryToGetExpense = `
