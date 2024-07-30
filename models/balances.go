@@ -3,7 +3,7 @@ package models
 import (
 	"database/sql"
 	"fmt"
-	"strconv"
+	"log"
 	"time"
 )
 
@@ -123,27 +123,27 @@ func (bal *Balances) getBalanacesForGroup(db *sql.DB, groupid int64) ([]Balances
 }
 
 // Update Balances data
-func (bal *Balances) UpdateBalances(db *sql.DB, AddToDataToBeUpdatedForExpense, updatedAddToDataForExpense map[string]interface{}) {
+func UpdateBalances(db *sql.DB, AddToDataToBeUpdatedForExpense, updatedAddToDataForExpense *Expense) {
 
+	fmt.Println(AddToDataToBeUpdatedForExpense)
+	calculateBalanceToBeRemoved, _ := CalculateBalance(AddToDataToBeUpdatedForExpense)
+	calculateBalanceToAdd, _ := CalculateBalance(updatedAddToDataForExpense)
 
+	calculateBalanceToAdd = append(calculateBalanceToAdd, calculateBalanceToBeRemoved...)
 
+	// Calculate net balances
+	netBalances := calculateNetBalances(calculateBalanceToAdd)
 
-	for key, value := range updatedAddToDataForExpense {
-		
-		// If These conditions pass then only Balances and wallet data needs to be updated
+	// Separate debtors and creditors
+	creditors, debtors := separateDebtorsAndCreditors(netBalances)
 
-		// Group Id can not be changed
-		if key == "Groupid" {
-			return
-		}
+	balances := minimizeTransactions(debtors, creditors, netBalances, AddToDataToBeUpdatedForExpense.Groupid)
 
-		// user intend to change ToUserId , FromUserId or Amount
-		//revert old transcations
+	err := DeleteUnnecessaryBalances(balances, AddToDataToBeUpdatedForExpense.Groupid)
+
+	if err != nil {
+		log.Fatalf("Error deleting balances: %v", err)
 	}
-
-	// adjustment := updatedAddToDataForExpense.Amount - AddToDataToBeUpdatedForExpense[Amount]
-
-	// new[amount] - old[amount]
 
 }
 
