@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 )
 
@@ -125,21 +126,39 @@ func (bal *Balances) getBalanacesForGroup(db *sql.DB, groupid int64) ([]Balances
 // Update Balances data
 func UpdateBalances(db *sql.DB, AddToDataToBeUpdatedForExpense, updatedAddToDataForExpense *Expense) {
 
-	fmt.Println(AddToDataToBeUpdatedForExpense)
+	balance := Balances{}
+	res, err := balance.getBalanacesForGroup(db, AddToDataToBeUpdatedForExpense.Groupid)
 	calculateBalanceToBeRemoved, _ := CalculateBalance(AddToDataToBeUpdatedForExpense)
 	calculateBalanceToAdd, _ := CalculateBalance(updatedAddToDataForExpense)
 
-	calculateBalanceToAdd = append(calculateBalanceToAdd, calculateBalanceToBeRemoved...)
+	res = append(res, calculateBalanceToAdd...)
+	res = append(res, calculateBalanceToBeRemoved...)
 
 	// Calculate net balances
 	netBalances := calculateNetBalances(calculateBalanceToAdd)
+
+	var wg sync.WaitGroup
+	wg.Add(len(res) + 1)
+
+	for _, debt := range res {
+		go func(debt Balances) {
+			defer wg.Done()
+
+			wallet := &Wallet{}
+			err = wallet.Update(db, debt.ToUserID, -debt.Amount)
+			if err != nil {
+				log.Printf("Error updating wallet for debtor %d: %v", debt.ToUserID, err)
+			}
+		}(debt)
+
+	}
 
 	// Separate debtors and creditors
 	creditors, debtors := separateDebtorsAndCreditors(netBalances)
 
 	balances := minimizeTransactions(debtors, creditors, netBalances, AddToDataToBeUpdatedForExpense.Groupid)
 
-	err := DeleteUnnecessaryBalances(balances, AddToDataToBeUpdatedForExpense.Groupid)
+	err = DeleteUnnecessaryBalances(balances, AddToDataToBeUpdatedForExpense.Groupid)
 
 	if err != nil {
 		log.Fatalf("Error deleting balances: %v", err)
