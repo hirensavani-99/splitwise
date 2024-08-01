@@ -12,6 +12,36 @@ import (
 	"hirensavani.com/db"
 )
 
+func UniqueBalances(balances []Balances) []Balances {
+	// Use a map to track unique Balances
+	uniqueBalances := make(map[string]Balances)
+
+	for _, balance := range balances {
+		key1 := fmt.Sprintf("%d-%d-%d", balance.FromUserID, balance.ToUserID, balance.GroupId)
+		key2 := fmt.Sprintf("%d-%d-%d", balance.ToUserID, balance.FromUserID, balance.GroupId)
+
+		if existing, exists := uniqueBalances[key2]; exists {
+			// If reverse pair exists, update the amount
+			existing.Amount += balance.Amount
+			uniqueBalances[key2] = existing
+		} else if existing, exists := uniqueBalances[key1]; exists {
+			// If direct pair exists, update the amount
+			existing.Amount += balance.Amount
+			uniqueBalances[key1] = existing
+		} else {
+			// Otherwise, add the new balance
+			uniqueBalances[key1] = balance
+		}
+	}
+
+	// Convert the map back to a slice
+	result := make([]Balances, 0, len(uniqueBalances))
+	for _, balance := range uniqueBalances {
+		result = append(result, balance)
+	}
+	return result
+}
+
 // Check expense with expense id exists or not
 func IsExpense(db *sql.DB, expenseId int64) bool {
 	var exists bool
