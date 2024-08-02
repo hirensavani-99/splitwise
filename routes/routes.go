@@ -11,4 +11,5 @@ func RegisterRoutes(server *gin.Engine) {
 	server.GET("/getWallet/:userId", getWalletById)
 	server.GET("/getExpenses/:userId", getAllExpenses)
 	server.PATCH("/Expense/:expenseId", updateExpense)
+	server.DELETE("/Expense/:expenseId", deleteExpense)
 }

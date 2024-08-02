@@ -24,6 +24,8 @@ const (
 	QueryToUpdateExpense = `UPDATE expense
 	SET `
 
+	QueryToDeleteExpense = `Delete from expense where id=$1;`
+
 	//Group query
 	QueryToGetGroupType = `Select simplify_debt from groups where id=$1;`
 

@@ -12,6 +12,67 @@ import (
 	"hirensavani.com/db"
 )
 
+// Convert Datatype map to Expense type
+func MapToExpenseType(ex map[string]interface{}) Expense {
+	updatedExpenseData := &Expense{}
+	for key, value := range ex {
+		// Todo : if update data does not contain enough data ...
+		if key == "added_by" {
+			switch v := value.(type) {
+			case int64:
+				// If value is already int64, assign it directly
+				updatedExpenseData.AddedBy = v
+			case float64:
+				// If value is float64, convert it to int64
+				updatedExpenseData.AddedBy = int64(v)
+			default:
+				fmt.Printf("Unexpected type for key %s: %T\n", key, value)
+			}
+		}
+
+		if key == "amount" {
+			if amount, ok := value.(float64); ok {
+				updatedExpenseData.Amount = amount
+			}
+		}
+		if key == "group_id" {
+			switch v := value.(type) {
+			case int64:
+				// If value is already int64, assign it directly
+				updatedExpenseData.Groupid = v
+			case float64:
+				// If value is float64, convert it to int64
+				updatedExpenseData.Groupid = int64(v)
+			default:
+				fmt.Printf("Unexpected type for key %s: %T\n", key, value)
+			}
+		}
+
+		if key == "split_type" {
+			if splitType, ok := value.(string); ok {
+				updatedExpenseData.SplitType = splitType
+			}
+		}
+
+		if key == "add_to" {
+
+			if addToInterface, ok := value.(map[string]interface{}); ok {
+				addToStringMap := make(map[string]string)
+				for k, v := range addToInterface {
+					if strValue, ok := v.(string); ok {
+						addToStringMap[k] = strValue
+					}
+				}
+
+				updatedExpenseData.AddTo = addToStringMap
+			}
+		}
+
+	}
+
+	return *updatedExpenseData
+}
+
 func UniqueBalances(balances []Balances) []Balances {
 	// Use a map to track unique Balances
 	uniqueBalances := make(map[string]Balances)

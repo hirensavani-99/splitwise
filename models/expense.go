@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -193,6 +192,25 @@ func (ex *Expense) GetExpenseByGroupId(db *sql.DB) ([]Expense, error) {
 	return expenses, nil
 }
 
+func GetExpenseByExpenseId(db *sql.DB, expenseId int64) (Expense, error) {
+	expense := &Expense{}
+
+	var addTo []byte
+
+	//Get Expense
+	err := db.QueryRow(QueryToGetExpenseByExpenseId, expenseId).Scan(&expense.ID, &expense.Description, &expense.Amount, &expense.Currency, &expense.Category, &expense.AddedAt, &expense.IsRecurring, &expense.RecurringPeriod, &expense.Notes, &expense.SplitType, &expense.Groupid, &expense.AddedBy, &addTo)
+
+	if err != nil {
+		return *expense, WrapError(err, ErrGettingExpenses)
+	}
+
+	if err := json.Unmarshal(addTo, &expense.AddTo); err != nil {
+		return *expense, WrapError(err, ErrUnMarshaling)
+	}
+	return *expense, nil
+
+}
+
 func GetAllExpense(db *sql.DB, userId int64) ([]Expense, error) {
 
 	var expenses []Expense
@@ -224,97 +242,52 @@ func GetAllExpense(db *sql.DB, userId int64) ([]Expense, error) {
 
 func UpdateExpense(db *sql.DB, ex map[string]interface{}, expenseId int64) error {
 
-	expenseToBeUpdated := &Expense{}
+	expenseToBeUpdated, err := GetExpenseByExpenseId(db, expenseId)
 
-	var addTo []byte
-	var spl string
-	//Get Expense
-	err := db.QueryRow(QueryToGetExpenseByExpenseId, expenseId).Scan(&expenseToBeUpdated.ID, &expenseToBeUpdated.Description, &expenseToBeUpdated.Amount, &expenseToBeUpdated.Currency, &expenseToBeUpdated.Category, &expenseToBeUpdated.AddedAt, &expenseToBeUpdated.IsRecurring, &expenseToBeUpdated.RecurringPeriod, &expenseToBeUpdated.Notes, &expenseToBeUpdated.SplitType, &expenseToBeUpdated.Groupid, &expenseToBeUpdated.AddedBy, &addTo)
-
-	fmt.Println(spl, reflect.TypeOf(spl))
 	if err != nil {
 		return WrapError(err, ErrGettingExpenses)
 	}
 
-	if err := json.Unmarshal(addTo, &expenseToBeUpdated.AddTo); err != nil {
-		return WrapError(err, "error unmarshalling add_to: %w")
-	}
-
 	query, err := buildUpdateQuery(ex, expenseId)
 	if err != nil {
-
-		return WrapError(err, "Error building update query:")
+		return WrapError(err, ErrBuildingQuery)
 	}
-
-	fmt.Println("Query:", query)
 
 	//Update Expense
 	_, err = db.Exec(query)
 
-	fmt.Println(expenseToBeUpdated)
 	if err != nil {
 		return WrapError(err, ErrExecutingQuery)
 	}
 
-	updatedExpenseData := &Expense{}
-	for key, value := range ex {
-		// Todo : if update data does not contain enough data ...
-		if key == "added_by" {
-			switch v := value.(type) {
-			case int64:
-				// If value is already int64, assign it directly
-				updatedExpenseData.AddedBy = v
-			case float64:
-				// If value is float64, convert it to int64
-				updatedExpenseData.AddedBy = int64(v)
-			default:
-				fmt.Printf("Unexpected type for key %s: %T\n", key, value)
-			}
-		}
-
-		if key == "amount" {
-			if amount, ok := value.(float64); ok {
-				updatedExpenseData.Amount = amount
-			}
-		}
-		if key == "group_id" {
-			switch v := value.(type) {
-			case int64:
-				// If value is already int64, assign it directly
-				updatedExpenseData.Groupid = v
-			case float64:
-				// If value is float64, convert it to int64
-				updatedExpenseData.Groupid = int64(v)
-			default:
-				fmt.Printf("Unexpected type for key %s: %T\n", key, value)
-			}
-		}
-
-		if key == "split_type" {
-			if splitType, ok := value.(string); ok {
-				updatedExpenseData.SplitType = splitType
-			}
-		}
-
-		if key == "add_to" {
-
-			if addToInterface, ok := value.(map[string]interface{}); ok {
-				addToStringMap := make(map[string]string)
-				for k, v := range addToInterface {
-					if strValue, ok := v.(string); ok {
-						addToStringMap[k] = strValue
-					}
-				}
-
-				updatedExpenseData.AddTo = addToStringMap
-			}
-		}
-
-	}
+	updatedExpenseData := MapToExpenseType(ex)
 
 	expenseToBeUpdated.Amount = -expenseToBeUpdated.Amount
 	// Update data from wallet , Balances and expense it self
-	UpdateBalances(db, expenseToBeUpdated, updatedExpenseData)
+	UpdateBalances(db, &expenseToBeUpdated, &updatedExpenseData)
+	return nil
+}
+
+func DeleteExpense(db *sql.DB, expenseId int64) error {
+
+	ExpenseToBeDeleted, err := GetExpenseByExpenseId(db, expenseId)
+
+	if err != nil {
+		return WrapError(err, ErrGettingExpenses)
+	}
+
+	fmt.Println(ExpenseToBeDeleted)
+	/* Todo : Update Expense and Wallet Data Accordingly
+
+
+	 */
+
+	_, err = db.Exec(QueryToDeleteExpense, expenseId)
+
+	if err != nil {
+		return WrapError(err, ErrExecutingQuery)
+	}
+
 	return nil
 }
 
