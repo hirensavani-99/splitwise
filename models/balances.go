@@ -126,15 +126,21 @@ func (bal *Balances) getBalanacesForGroup(db *sql.DB, groupid int64) ([]Balances
 // Update Balances data
 func UpdateBalances(db *sql.DB, AddToDataToBeUpdatedForExpense, updatedAddToDataForExpense *Expense) {
 
-	// balance := Balances{}
+	balance := Balances{}
 
-	var res []Balances
-
+	res, err := balance.getBalanacesForGroup(db, AddToDataToBeUpdatedForExpense.Groupid)
 	calculateBalanceToBeRemoved, payerPayBack := CalculateBalance(AddToDataToBeUpdatedForExpense)
-	calculateBalanceToAdd, payerGetBack := CalculateBalance(updatedAddToDataForExpense)
+
+	var calculateBalanceToAdd []Balances
+	var payerGetBack float64
+
+	if updatedAddToDataForExpense != nil {
+		calculateBalanceToAdd, payerGetBack = CalculateBalance(updatedAddToDataForExpense)
+	}
 
 	res = append(append(res, calculateBalanceToAdd...), calculateBalanceToBeRemoved...)
 
+	fmt.Println(res)
 	newbalances := UniqueBalances(res)
 
 	// Calculate net balances
@@ -143,12 +149,14 @@ func UpdateBalances(db *sql.DB, AddToDataToBeUpdatedForExpense, updatedAddToData
 	var wg sync.WaitGroup
 	wg.Add(len(newbalances) + 1)
 
+	fmt.Println(newbalances)
+
 	for _, debt := range newbalances {
 		go func(debt Balances) {
 			defer wg.Done()
 
 			wallet := &Wallet{}
-			err := wallet.Update(db, debt.ToUserID, -debt.Amount)
+			err := wallet.Update(db, debt.ToUserID, debt.Amount)
 			if err != nil {
 				log.Printf("Error updating wallet for debtor %d: %v", debt.ToUserID, err)
 			}
@@ -172,7 +180,7 @@ func UpdateBalances(db *sql.DB, AddToDataToBeUpdatedForExpense, updatedAddToData
 
 	balances := minimizeTransactions(debtors, creditors, netBalances, AddToDataToBeUpdatedForExpense.Groupid)
 
-	err := DeleteUnnecessaryBalances(balances, AddToDataToBeUpdatedForExpense.Groupid)
+	err = DeleteUnnecessaryBalances(balances, AddToDataToBeUpdatedForExpense.Groupid)
 
 	if err != nil {
 		log.Fatalf("Error deleting balances: %v", err)
