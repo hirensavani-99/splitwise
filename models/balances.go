@@ -129,24 +129,19 @@ func UpdateBalances(db *sql.DB, AddToDataToBeUpdatedForExpense, updatedAddToData
 	// balance := Balances{}
 
 	var res []Balances
-	// res, err := balance.getBalanacesForGroup(db, AddToDataToBeUpdatedForExpense.Groupid)
-	// fmt.Println("-->1", res)
+
 	calculateBalanceToBeRemoved, payerPayBack := CalculateBalance(AddToDataToBeUpdatedForExpense)
 	calculateBalanceToAdd, payerGetBack := CalculateBalance(updatedAddToDataForExpense)
 
-	fmt.Println(payerPayBack, payerGetBack)
 	res = append(append(res, calculateBalanceToAdd...), calculateBalanceToBeRemoved...)
 
 	newbalances := UniqueBalances(res)
-
-	fmt.Println(newbalances, calculateBalanceToBeRemoved, calculateBalanceToAdd, payerPayBack, payerGetBack)
 
 	// Calculate net balances
 	netBalances := calculateNetBalances(calculateBalanceToAdd)
 
 	var wg sync.WaitGroup
 	wg.Add(len(newbalances) + 1)
-	fmt.Println(newbalances)
 
 	for _, debt := range newbalances {
 		go func(debt Balances) {

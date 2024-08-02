@@ -59,7 +59,6 @@ func updateExpense(context *gin.Context) {
 
 	err = context.ShouldBindJSON(&expense)
 
-	fmt.Println("--->", expense)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data."})
 	}
@@ -67,11 +66,28 @@ func updateExpense(context *gin.Context) {
 	err = models.UpdateExpense(db.DB, expense, ExpenseId)
 
 	if err != nil {
-		fmt.Println(err)
+
 		context.JSON(http.StatusBadRequest, gin.H{"message": "issue updating Expenses", "err": err})
 		return
 	}
 
 	context.JSON(http.StatusOK, gin.H{"Expenses": expense})
 
+}
+
+func deleteExpense(context *gin.Context) {
+	ExpenseId, err := strconv.ParseInt(context.Param("expenseId"), 10, 64)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Invalid ExpenseId"})
+		return
+	}
+
+	err = models.DeleteExpense(db.DB, ExpenseId)
+
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "issue Deleting Expenses", "err": err})
+		return
+	}
+
+	context.JSON(http.StatusOK, gin.H{"message": "Expense Deleted successfully"})
 }
