@@ -134,9 +134,7 @@ func CalculateBalance(expense *Expense) ([]Balances, float64) {
 
 	var balances []Balances
 
-	fmt.Println("-->utility", expense.AddTo)
 	for userId, _ := range expense.AddTo {
-		fmt.Println("loop ->", userId, expense)
 
 		userID, _ := strconv.ParseInt(userId, 10, 64)
 

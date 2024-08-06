@@ -128,52 +128,50 @@ func UpdateBalances(db *sql.DB, AddToDataToBeUpdatedForExpense, updatedAddToData
 
 	balance := Balances{}
 
+	// Get balances for group to settle up the balances
 	res, err := balance.getBalanacesForGroup(db, AddToDataToBeUpdatedForExpense.Groupid)
-	calculateBalanceToBeRemoved, payerPayBack := CalculateBalance(AddToDataToBeUpdatedForExpense)
 
+	// Expense which needs to be removed ,
+	calculateBalanceToBeRemoved, _ := CalculateBalance(AddToDataToBeUpdatedForExpense)
+
+	// Function is being used for delete expense as well so defining data to be add if function user for update or else it will be niil if use for Delete
 	var calculateBalanceToAdd []Balances
-	var payerGetBack float64
 
 	if updatedAddToDataForExpense != nil {
-		calculateBalanceToAdd, payerGetBack = CalculateBalance(updatedAddToDataForExpense)
+		calculateBalanceToAdd, _ = CalculateBalance(updatedAddToDataForExpense)
+	}
+
+	//Data Too update wallet mixing up expense to be removed and add
+	var UpdateWalletData []Balances
+
+	//appending to be add and to be removed data in the UpdateWalletData & convert that in to net balance formate : map[1:5 2:5 3:-10]
+
+	UpdateWalletData = append(append(UpdateWalletData, calculateBalanceToAdd...), calculateBalanceToBeRemoved...)
+	updateWalletBalances := UniqueBalances(UpdateWalletData)
+	netBalancesToUpdateWallet := calculateNetBalances(updateWalletBalances)
+
+	var wg sync.WaitGroup
+	wg.Add(len(netBalancesToUpdateWallet))
+
+	//Updating wallet
+	for toUser, amount := range netBalancesToUpdateWallet {
+
+		go func(toUser int64, amount float64) {
+			defer wg.Done()
+			wallet := &Wallet{}
+			err := wallet.Update(db, toUser, amount)
+			if err != nil {
+				log.Printf("Error updating wallet for debtor %d: %v", toUser, err)
+			}
+		}(toUser, amount)
+
 	}
 
 	res = append(append(res, calculateBalanceToAdd...), calculateBalanceToBeRemoved...)
-
-	fmt.Println(res)
 	newbalances := UniqueBalances(res)
 
 	// Calculate net balances
-	netBalances := calculateNetBalances(calculateBalanceToAdd)
-
-	var wg sync.WaitGroup
-	wg.Add(len(newbalances) + 1)
-
-	fmt.Println(newbalances)
-
-	for _, debt := range newbalances {
-		go func(debt Balances) {
-			defer wg.Done()
-
-			wallet := &Wallet{}
-			err := wallet.Update(db, debt.ToUserID, debt.Amount)
-			if err != nil {
-				log.Printf("Error updating wallet for debtor %d: %v", debt.ToUserID, err)
-			}
-		}(debt)
-
-	}
-
-	go func() {
-		defer wg.Done()
-
-		wallet := &Wallet{}
-		err := wallet.Update(db, AddToDataToBeUpdatedForExpense.AddedBy, payerGetBack+payerPayBack)
-		if err != nil {
-			log.Printf("Error updating wallet for creditor %d: %v", AddToDataToBeUpdatedForExpense.AddedBy, err)
-		}
-
-	}()
+	netBalances := calculateNetBalances(newbalances)
 
 	// Separate debtors and creditors
 	creditors, debtors := separateDebtorsAndCreditors(netBalances)
