@@ -281,6 +281,7 @@ func DeleteExpense(db *sql.DB, expenseId int64) error {
 
 
 	 */
+	ExpenseToBeDeleted.Amount = -ExpenseToBeDeleted.Amount
 
 	UpdateBalances(db, &ExpenseToBeDeleted, nil)
 

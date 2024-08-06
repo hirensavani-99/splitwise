@@ -143,7 +143,7 @@ func UpdateBalances(db *sql.DB, AddToDataToBeUpdatedForExpense, updatedAddToData
 
 	//Data Too update wallet mixing up expense to be removed and add
 	var UpdateWalletData []Balances
-
+	
 	//appending to be add and to be removed data in the UpdateWalletData & convert that in to net balance formate : map[1:5 2:5 3:-10]
 
 	UpdateWalletData = append(append(UpdateWalletData, calculateBalanceToAdd...), calculateBalanceToBeRemoved...)
