@@ -184,6 +184,8 @@ func UpdateBalances(db *sql.DB, AddToDataToBeUpdatedForExpense, updatedAddToData
 		log.Fatalf("Error deleting balances: %v", err)
 	}
 
+	
+
 }
 
 func NewBalances(FromUserID int64, ToUserID int64, GroupId int64, Amount float64) Balances {
