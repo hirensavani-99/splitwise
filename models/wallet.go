@@ -10,7 +10,7 @@ type Wallet struct {
 	UserID    int64
 	Balance   float64
 	Currency  string
-	Balances  map[int64]float64
+	Balances  map[int64]map[int64]float64
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -69,7 +69,7 @@ func (wallet *Wallet) Update(db *sql.DB, userid int64, adjustment float64) error
 
 	wallet.Balance += adjustment
 	wallet.UpdatedAt = time.Now()
-	
+
 	//Update wallet
 	_, err = db.Exec(QueryToUpdateWalletBalance, userid, wallet.Balance, wallet.UpdatedAt)
 
