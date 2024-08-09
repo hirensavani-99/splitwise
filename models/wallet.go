@@ -15,6 +15,12 @@ type Wallet struct {
 	UpdatedAt time.Time
 }
 
+type SettlementType struct {
+	payeeID int64
+	payerID int64
+	Amount  float64
+}
+
 func (wallet *Wallet) Save(db *sql.DB) error {
 
 	stmt, err := db.Prepare(QueryToSaveWallet)
@@ -83,6 +89,33 @@ func (wallet *Wallet) Update(db *sql.DB, userid int64, adjustment float64) error
 		return fmt.Errorf("failed to commit transcations.")
 	}
 	return nil
+}
+
+func (settlement *SettlementType) SettleUpWallet(db *sql.DB) error {
+
+	var bal *Balances
+	/*
+		{
+			1,
+			2,
+			100
+		}
+	*/
+
+	// Get balances where user 1 and 2 both exist I will check How much I can settled up rest will be moved for next Group
+	rows, err := db.Query(QueryToGetBalancesWhereBothUsersExists, settlement.payeeID, settlement.payerID)
+
+	if err != nil {
+		return WrapError(err, ErrExecutingQuery)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		if err = rows.Scan(&bal.FromUserID, bal.ToUserID, bal.GroupId, bal.Amount); err != nil {
+			return WrapError(err, ErrScaningRow)
+		}
+		
+	}
+	// Update Wallet
 }
 
 func NewWallet(userId int64, balance float64, currency string) Wallet {
