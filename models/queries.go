@@ -43,6 +43,12 @@ const (
 	FROM Balances
 	WHERE from_user_id = $1 OR to_user_id = $1;
 `
+	QueryToGetBalancesWhereBothUsersExists = `
+	SELECT from_user_id, to_user_id,group_id, amount
+	FROM Balances
+	WHERE (from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $1 AND to_user_id = $2);
+`
+
 	QueryToGetExistingBalances = `SELECT from_user_id, to_user_id, amount , group_id FROM BALANCES WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1)) AND group_id=$3;`
 
 	QueryToGetBalanceByGrouId = `Select from_user_id , to_user_id , group_id , amount from balances where group_id=$1;`
