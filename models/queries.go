@@ -39,7 +39,7 @@ const (
 
 	//Balance query
 	QueryToGetBalances = `	
-	SELECT from_user_id, to_user_id, amount
+	SELECT from_user_id, to_user_id,group_id, amount
 	FROM Balances
 	WHERE from_user_id = $1 OR to_user_id = $1;
 `

@@ -70,8 +70,8 @@ func (bal *Balances) Save(db *sql.DB, isCalculated bool) error {
 	return nil
 }
 
-func (bal *Balances) Get(db *sql.DB, userID int64) (map[int64]float64, error) {
-	balances := make(map[int64]float64)
+func (bal *Balances) Get(db *sql.DB, userID int64) (map[int64]map[int64]float64, error) {
+	balances := make(map[int64]map[int64]float64)
 
 	rows, err := db.Query(QueryToGetBalances, userID)
 	if err != nil {
@@ -81,15 +81,26 @@ func (bal *Balances) Get(db *sql.DB, userID int64) (map[int64]float64, error) {
 
 	for rows.Next() {
 
-		if err := rows.Scan(&bal.FromUserID, &bal.ToUserID, &bal.Amount); err != nil {
+		if err := rows.Scan(&bal.FromUserID, &bal.ToUserID, &bal.GroupId, &bal.Amount); err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
 
+		var targetUserID int64
+		var amount float64
 		if bal.FromUserID != userID {
-			balances[bal.FromUserID] = -bal.Amount
+			targetUserID = bal.FromUserID
+			amount = -bal.Amount
 		} else {
-			balances[bal.ToUserID] = bal.Amount
+			targetUserID = bal.ToUserID
+			amount = bal.Amount
+
 		}
+
+		if _, exists := balances[targetUserID]; !exists {
+			balances[targetUserID] = make(map[int64]float64)
+		}
+
+		balances[targetUserID][bal.GroupId] = amount
 	}
 
 	if err := rows.Err(); err != nil {
@@ -143,7 +154,7 @@ func UpdateBalances(db *sql.DB, AddToDataToBeUpdatedForExpense, updatedAddToData
 
 	//Data Too update wallet mixing up expense to be removed and add
 	var UpdateWalletData []Balances
-	
+
 	//appending to be add and to be removed data in the UpdateWalletData & convert that in to net balance formate : map[1:5 2:5 3:-10]
 
 	UpdateWalletData = append(append(UpdateWalletData, calculateBalanceToAdd...), calculateBalanceToBeRemoved...)
@@ -183,8 +194,6 @@ func UpdateBalances(db *sql.DB, AddToDataToBeUpdatedForExpense, updatedAddToData
 	if err != nil {
 		log.Fatalf("Error deleting balances: %v", err)
 	}
-
-	
 
 }
 

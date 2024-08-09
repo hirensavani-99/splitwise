@@ -25,3 +25,12 @@ func getWalletById(context *gin.Context) {
 
 	context.JSON(http.StatusOK, gin.H{"wallet": wallet})
 }
+
+// func SettledUpWallet(context *gin.Context) {
+// 	_, err := strconv.ParseInt(context.Param("userId"), 10, 64)
+// 	if err != nil {
+// 		context.JSON(http.StatusBadRequest, gin.H{"message": "Invalid userId"})
+// 		return
+// 	}
+
+// }
