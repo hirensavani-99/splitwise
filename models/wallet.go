@@ -91,9 +91,9 @@ func (wallet *Wallet) Update(db *sql.DB, userid int64, adjustment float64) error
 	return nil
 }
 
-func (settlement *SettlementType) SettleUpWallet(db *sql.DB) error {
+func (settlement SettlementType) SettleUpWallet(db *sql.DB) error {
+	fmt.Println("123")
 
-	var bal *Balances
 	/*
 		{
 			1,
@@ -103,19 +103,30 @@ func (settlement *SettlementType) SettleUpWallet(db *sql.DB) error {
 	*/
 
 	// Get balances where user 1 and 2 both exist I will check How much I can settled up rest will be moved for next Group
-	rows, err := db.Query(QueryToGetBalancesWhereBothUsersExists, settlement.payeeID, settlement.payerID)
-
+	rows, err := db.Query(QueryToGetBalancesWhereBothUsersExists, &settlement.payeeID, &settlement.payerID)
 	if err != nil {
 		return WrapError(err, ErrExecutingQuery)
 	}
-	defer rows.Close()
+	defer rows.Close() // Ensure rows are closed when the function exits
+
+	fmt.Println("--->", settlement.payeeID, settlement.payerID)
+	// Loop through each row in the result set
 	for rows.Next() {
-		if err = rows.Scan(&bal.FromUserID, bal.ToUserID, bal.GroupId, bal.Amount); err != nil {
+		fmt.Println("in rows")
+		var bal *Balances // Assuming you have a Balance struct defined
+		if err := rows.Scan(&bal.FromUserID, &bal.ToUserID, &bal.GroupId, &bal.Amount); err != nil {
 			return WrapError(err, ErrScaningRow)
 		}
-		
+
+		fmt.Println(bal) // Print the balance data (or process it as needed)
 	}
-	// Update Wallet
+
+	// Check for errors encountered during iteration
+	if err := rows.Err(); err != nil {
+		return WrapError(err, "Error Row iteration")
+	}
+
+	return nil
 }
 
 func NewWallet(userId int64, balance float64, currency string) Wallet {
