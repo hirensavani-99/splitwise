@@ -16,9 +16,9 @@ type Wallet struct {
 }
 
 type SettlementType struct {
-	payeeID int64
-	payerID int64
-	Amount  float64
+	PayeeID int64   `json:"payee_id"`
+	PayerID int64   `json:"payer_id"`
+	Amount  float64 `json:"amount"`
 }
 
 func (wallet *Wallet) Save(db *sql.DB) error {
@@ -91,7 +91,7 @@ func (wallet *Wallet) Update(db *sql.DB, userid int64, adjustment float64) error
 	return nil
 }
 
-func (settlement SettlementType) SettleUpWallet(db *sql.DB) error {
+func (settlement *SettlementType) SettleUpWallet(db *sql.DB) error {
 	fmt.Println("123")
 
 	/*
@@ -103,17 +103,17 @@ func (settlement SettlementType) SettleUpWallet(db *sql.DB) error {
 	*/
 
 	// Get balances where user 1 and 2 both exist I will check How much I can settled up rest will be moved for next Group
-	rows, err := db.Query(QueryToGetBalancesWhereBothUsersExists, &settlement.payeeID, &settlement.payerID)
+	rows, err := db.Query(QueryToGetBalancesWhereBothUsersExists, &settlement.PayeeID, &settlement.PayerID)
 	if err != nil {
 		return WrapError(err, ErrExecutingQuery)
 	}
 	defer rows.Close() // Ensure rows are closed when the function exits
 
-	fmt.Println("--->", settlement.payeeID, settlement.payerID)
+	fmt.Println("--->", settlement.PayeeID, settlement.PayerID)
 	// Loop through each row in the result set
 	for rows.Next() {
 		fmt.Println("in rows")
-		var bal *Balances // Assuming you have a Balance struct defined
+		var bal Balances // Assuming you have a Balance struct defined
 		if err := rows.Scan(&bal.FromUserID, &bal.ToUserID, &bal.GroupId, &bal.Amount); err != nil {
 			return WrapError(err, ErrScaningRow)
 		}
