@@ -46,7 +46,7 @@ const (
 	QueryToGetBalancesWhereBothUsersExists = `
 	SELECT from_user_id, to_user_id,group_id, amount
 	FROM Balances
-	WHERE (from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $1 AND to_user_id = $2);
+	WHERE (from_user_id = $1 AND to_user_id = $2);
 `
 
 	QueryToGetExistingBalances = `SELECT from_user_id, to_user_id, amount , group_id FROM BALANCES WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1)) AND group_id=$3;`
@@ -65,6 +65,10 @@ const (
 	SET amount=$4, from_user_id=$2, to_user_id=$1
 	WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1) AND group_id=$3);
 `
+
+	QueryToDeleteUnnecessaryBalancesByGroupId = `
+	DELETE FROM balances
+	WHERE group_id = $1`
 
 	QueryToDeleteUnnecessaryBalances = `
 	DELETE FROM balances

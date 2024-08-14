@@ -83,7 +83,7 @@ func UniqueBalances(balances []Balances) []Balances {
 
 		if existing, exists := uniqueBalances[key2]; exists {
 			// If reverse pair exists, update the amount
-			existing.Amount += balance.Amount
+			existing.Amount -= balance.Amount
 			uniqueBalances[key2] = existing
 		} else if existing, exists := uniqueBalances[key1]; exists {
 			// If direct pair exists, update the amount
@@ -237,6 +237,15 @@ func minimizeTransactions(debtors []int64, creditors []int64, netBalances map[in
 func DeleteUnnecessaryBalances(keepRecords []Balances, groupId int64) error {
 	// Construct the SQL query
 	query := QueryToDeleteUnnecessaryBalances
+
+	if len(keepRecords) == 0 {
+		_, err := db.DB.Exec(QueryToDeleteUnnecessaryBalancesByGroupId, groupId)
+
+		if err != nil {
+			return fmt.Errorf("failed to delete records: %w", err)
+		}
+
+	}
 
 	var records []string
 	for _, record := range keepRecords {
