@@ -3,6 +3,7 @@ package models
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -94,14 +95,6 @@ func (wallet *Wallet) Update(db *sql.DB, userid int64, adjustment float64) error
 func (settlement *SettlementType) SettleUpWallet(db *sql.DB) error {
 	fmt.Println("123")
 
-	/*
-		{
-			1,
-			2,
-			100
-		}
-	*/
-
 	// Get balances where user 1 and 2 both exist I will check How much I can settled up rest will be moved for next Group
 	rows, err := db.Query(QueryToGetBalancesWhereBothUsersExists, &settlement.PayeeID, &settlement.PayerID)
 	if err != nil {
@@ -109,16 +102,78 @@ func (settlement *SettlementType) SettleUpWallet(db *sql.DB) error {
 	}
 	defer rows.Close() // Ensure rows are closed when the function exits
 
-	fmt.Println("--->", settlement.PayeeID, settlement.PayerID)
 	// Loop through each row in the result set
 	for rows.Next() {
-		fmt.Println("in rows")
-		var bal Balances // Assuming you have a Balance struct defined
-		if err := rows.Scan(&bal.FromUserID, &bal.ToUserID, &bal.GroupId, &bal.Amount); err != nil {
-			return WrapError(err, ErrScaningRow)
+
+		if settlement.Amount >= 0 {
+
+			var bal Balances // Assuming you have a Balance struct defined
+			if err := rows.Scan(&bal.FromUserID, &bal.ToUserID, &bal.GroupId, &bal.Amount); err != nil {
+				return WrapError(err, ErrScaningRow)
+			}
+
+			settlement.Amount = settlement.Amount - bal.Amount
+			bal.FromUserID = settlement.PayerID
+			bal.ToUserID = settlement.PayeeID
+
+			fmt.Println(bal)
+
+			balance := Balances{}
+			//get Balance For group id
+			res, err := balance.getBalanacesForGroup(db, bal.GroupId)
+
+			if err != nil {
+				return WrapError(err, ErrGettingGroupBalances)
+			}
+
+			// Update wallet
+			wallet := &Wallet{}
+
+			// Update wallet for Payer
+			err = wallet.Update(db, settlement.PayerID, bal.Amount)
+
+			if err != nil {
+				return WrapError(err, ErrUpdatingWallet)
+			}
+
+			// Update wallet for payee
+			err = wallet.Update(db, settlement.PayeeID, -bal.Amount)
+
+			if err != nil {
+				return WrapError(err, ErrUpdatingWallet)
+			}
+
+			// Update Balances
+
+			res = append(res, bal)
+
+			fmt.Println(res)
+
+			newbalances := UniqueBalances(res)
+
+			fmt.Println(newbalances)
+
+			// Calculate net balances
+			netBalances := calculateNetBalances(newbalances)
+
+			fmt.Println(netBalances)
+
+			// Separate debtors and creditors
+			creditors, debtors := separateDebtorsAndCreditors(netBalances)
+
+			fmt.Println(creditors, debtors)
+
+			balances := minimizeTransactions(debtors, creditors, netBalances, bal.GroupId)
+
+			fmt.Println(balances)
+
+			err = DeleteUnnecessaryBalances(balances, bal.GroupId)
+
+			if err != nil {
+				log.Fatalf("Error deleting balances: %v", err)
+			}
 		}
 
-		fmt.Println(bal) // Print the balance data (or process it as needed)
 	}
 
 	// Check for errors encountered during iteration
