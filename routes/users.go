@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -9,30 +8,32 @@ import (
 	"hirensavani.com/models"
 )
 
-func signUp(context *gin.Context) {
+// CreateAccount handles the user sign up process. It creates a user and a wallet.
+func CreateAccount(c *gin.Context) {
 	var user models.User
 
-	err := context.ShouldBindJSON(&user)
-
-	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data."})
+	// Bind the request body to the user struct.
+	if err := c.ShouldBindJSON(&user); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse request data"})
 		return
 	}
 
-	userId, err := user.Save()
-
+	// Save the user to the database.
+	userID, err := user.Save()
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not save user.", "err": err})
-		return
-	}
-	res := models.NewWallet(userId, 0.0, "CAD")
-	err = res.Save(db.DB)
-	fmt.Println(err)
-
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not create wallet.", "err": err})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save user"})
 		return
 	}
 
-	context.JSON(http.StatusCreated, gin.H{"message": "User & wallete are  created successfully"})
+	// Create a new wallet for the user.
+	wallet := models.NewWallet(userID, 0.0, "CAD")
+
+	// Save the wallet to the database.
+	if err := wallet.Save(db.DB); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create wallet"})
+		return
+	}
+
+	// Return a success message.
+	c.JSON(http.StatusCreated, gin.H{"message": "User and wallet created successfully"})
 }
